@@ -3,6 +3,12 @@ from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime, timedelta
 import asyncio
 
+# add src into path, src path upper level two from this file
+import sys
+import os
+# Add src into path, src path upper level two from this file
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
 from src.message_handler import (
     MessageHandler, MessageQueue, Message, 
     RetainedMessage, QoSMessage
@@ -247,4 +253,19 @@ class TestMessageHandler(unittest.TestCase):
         self.assertEqual(len(messages), 0)
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)
+    # Create a test suite combining all test cases
+    suite = unittest.TestSuite()
+
+    suite.addTest(TestMessageQueue("test_retained_message_storage"))
+    suite.addTest(TestMessageQueue("test_inflight_message_tracking"))
+    suite.addTest(TestMessageQueue("test_message_queue_operations"))
+
+    suite.addTest(TestMessageHandler("test_publish_message_routing"))
+    suite.addTest(TestMessageHandler("test_qos_retry_mechanism"))
+    suite.addTest(TestMessageHandler("test_message_acknowledgment"))
+    suite.addTest(TestMessageHandler("test_session_message_retrieval"))
+
+    # Run the test suite
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
