@@ -246,5 +246,27 @@ class TestMessageHandler(unittest.TestCase):
         messages = self.message_handler.get_session_messages("missing_client")
         self.assertEqual(len(messages), 0)
 
+def run_tests():
+    """Run message handler test suites"""
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    
+    # Add test classes to suite
+    suite.addTests(loader.loadTestsFromTestCase(TestMessageQueue))
+    suite.addTests(loader.loadTestsFromTestCase(TestMessageHandler))
+    
+    # Run tests
+    runner = unittest.TextTestRunner(verbosity=2)
+    return runner.run(suite).wasSuccessful()
+
 if __name__ == '__main__':
-    unittest.main()
+    import sys
+    import os
+    
+    # Add upper level paths
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(os.path.dirname(current_dir))
+    grandparent_dir = os.path.dirname(parent_dir)
+    sys.path.extend([parent_dir, grandparent_dir])
+    
+    sys.exit(not run_tests())

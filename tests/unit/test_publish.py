@@ -242,5 +242,28 @@ class TestDeliveryTracking(unittest.IsolatedAsyncioTestCase):
         # Duplicate acknowledgment should not raise error
         await self.publish_handler.handle_puback(packet_id)
 
+def run_tests():
+    """Run publish test suites"""
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    
+    # Add test classes to suite
+    suite.addTests(loader.loadTestsFromTestCase(TestPublishPacketCreation))
+    suite.addTests(loader.loadTestsFromTestCase(TestQoSMechanics))
+    suite.addTests(loader.loadTestsFromTestCase(TestDeliveryTracking))
+    
+    # Run tests
+    runner = unittest.TextTestRunner(verbosity=2)
+    return runner.run(suite).wasSuccessful()
+
 if __name__ == '__main__':
-    unittest.main()
+    import sys
+    import os
+    
+    # Add upper level paths
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(os.path.dirname(current_dir))
+    grandparent_dir = os.path.dirname(parent_dir)
+    sys.path.extend([parent_dir, grandparent_dir])
+    
+    sys.exit(not run_tests())

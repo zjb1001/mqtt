@@ -303,5 +303,28 @@ class TestSessionStateOperations(unittest.TestCase):
         self.assertFalse(serialized_data['clean_session'])
         self.assertIn("test/topic", serialized_data['subscriptions'])
 
+def run_tests():
+    """Run session test suites"""
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    
+    # Add test classes to suite
+    suite.addTests(loader.loadTestsFromTestCase(TestSessionStateManagement))
+    suite.addTests(loader.loadTestsFromTestCase(TestQoSMessageManagement))
+    suite.addTests(loader.loadTestsFromTestCase(TestSessionStateOperations))
+    
+    # Run tests
+    runner = unittest.TextTestRunner(verbosity=2)
+    return runner.run(suite).wasSuccessful()
+
 if __name__ == '__main__':
-    unittest.main()
+    import sys
+    import os
+    
+    # Add upper level paths
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(os.path.dirname(current_dir))
+    grandparent_dir = os.path.dirname(parent_dir)
+    sys.path.extend([parent_dir, grandparent_dir])
+    
+    sys.exit(not run_tests())
