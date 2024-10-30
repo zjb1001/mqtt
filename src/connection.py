@@ -4,6 +4,9 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from enum import IntEnum
 
+from src.session import SessionState
+from src.will_message import WillMessage
+
 class MessageType(IntEnum):
     CONNECT = 1
     CONNACK = 2
@@ -217,6 +220,9 @@ class ConnectionHandler:
             await old_writer.drain()
             old_writer.close()
         
+        # Update to new writer
+        self.connections[packet.client_id] = writer  # Update to new writer
+
         # Handle session state
         session_present = False
         if packet.client_id in self.session_states and not packet.clean_session:
