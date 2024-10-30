@@ -3,6 +3,12 @@ import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
+# add src into path, src path upper level two from this file
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
 from src.publish import PublishHandler, PublishPacket, MessageType, QoSLevel
 
 class TestPublishPacketCreation(unittest.TestCase):
@@ -242,28 +248,29 @@ class TestDeliveryTracking(unittest.IsolatedAsyncioTestCase):
         # Duplicate acknowledgment should not raise error
         await self.publish_handler.handle_puback(packet_id)
 
-def run_tests():
-    """Run publish test suites"""
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-    
-    # Add test classes to suite
-    suite.addTests(loader.loadTestsFromTestCase(TestPublishPacketCreation))
-    suite.addTests(loader.loadTestsFromTestCase(TestQoSMechanics))
-    suite.addTests(loader.loadTestsFromTestCase(TestDeliveryTracking))
-    
-    # Run tests
-    runner = unittest.TextTestRunner(verbosity=2)
-    return runner.run(suite).wasSuccessful()
-
 if __name__ == '__main__':
-    import sys
-    import os
+    unittest.main(verbosity=2)
     
-    # Add upper level paths
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(os.path.dirname(current_dir))
-    grandparent_dir = os.path.dirname(parent_dir)
-    sys.path.extend([parent_dir, grandparent_dir])
-    
-    sys.exit(not run_tests())
+    # Create a test suite combining all test cases
+    suite = unittest.TestSuite()
+
+    suite.addTest(TestPublishPacketCreation("test_qos0_packet_creation"))
+    suite.addTest(TestPublishPacketCreation("test_qos1_packet_creation"))
+    suite.addTest(TestPublishPacketCreation("test_retained_packet_creation"))
+    suite.addTest(TestPublishPacketCreation("test_packet_encoding"))
+    suite.addTest(TestPublishPacketCreation("test_duplicate_packet_creation"))
+
+    suite.addTest(TestQoSMechanics("test_qos0_publish"))
+    suite.addTest(TestQoSMechanics("test_qos1_publish"))
+    suite.addTest(TestQoSMechanics("test_qos2_publish"))
+    suite.addTest(TestQoSMechanics("test_packet_id_generation"))
+
+    suite.addTest(TestDeliveryTracking("test_qos1_acknowledgment"))
+    suite.addTest(TestDeliveryTracking("test_retry_mechanism"))
+    suite.addTest(TestDeliveryTracking("test_message_expiry"))
+    suite.addTest(TestDeliveryTracking("test_concurrent_message_tracking"))
+    suite.addTest(TestDeliveryTracking("test_duplicate_acknowledgment"))
+
+    # Run the test suite
+    runner = unittest.TextTestRunner()
+    runner.run(suite)

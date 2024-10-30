@@ -3,6 +3,12 @@ import asyncio
 from unittest.mock import Mock, patch
 from datetime import datetime
 
+# add src into path, src path upper level two from this file
+import sys
+import os
+# Add src into path, src path upper level two from this file
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
 from src.connection import (
     ConnectionHandler,
     ConnectPacket,
@@ -185,28 +191,23 @@ class TestErrorHandling(unittest.IsolatedAsyncioTestCase):
         
         mock_writer.close.assert_called_once()
 
-def run_tests():
-    """Run connection test suites"""
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-    
-    # Add test classes to suite
-    suite.addTests(loader.loadTestsFromTestCase(TestConnectPacketEncodingDecoding))
-    suite.addTests(loader.loadTestsFromTestCase(TestConnectionEstablishment))
-    suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
-    
-    # Run tests
-    runner = unittest.TextTestRunner(verbosity=2)
-    return runner.run(suite).wasSuccessful()
-
 if __name__ == '__main__':
-    import sys
-    import os
+    unittest.main(verbosity=2)
     
-    # Add upper level paths
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(os.path.dirname(current_dir))
-    grandparent_dir = os.path.dirname(parent_dir)
-    sys.path.extend([parent_dir, grandparent_dir])
-    
-    sys.exit(not run_tests())
+    # Create a test suite combining all test cases
+    suite = unittest.TestSuite()
+
+    suite.addTest(TestConnectPacketEncodingDecoding("test_encode_minimal_connect_packet"))
+    suite.addTest(TestConnectPacketEncodingDecoding("test_encode_full_connect_packet"))
+    suite.addTest(TestConnectPacketEncodingDecoding("test_decode_connect_packet"))
+
+    suite.addTest(TestConnectionEstablishment("test_new_client_connection"))
+    suite.addTest(TestConnectionEstablishment("test_existing_client_reconnection"))
+
+    suite.addTest(TestErrorHandling("test_invalid_first_byte"))
+    suite.addTest(TestErrorHandling("test_malformed_packet"))
+    suite.addTest(TestErrorHandling("test_protocol_error"))
+
+    # Run the test suite
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
