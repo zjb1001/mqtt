@@ -256,6 +256,7 @@ class TestMessageHandler(unittest.TestCase):
         messages = self.message_handler.get_session_messages("missing_client")
         self.assertEqual(len(messages), 0)
 
+
 if __name__ == '__main__':
     # Create a test suite combining all test cases
     suite = unittest.TestSuite()

@@ -214,5 +214,28 @@ class TestWillMessageTriggers(unittest.TestCase):
         # Verify will message should not be triggered
         self.assertFalse(mock_connection.should_send_will())
 
+def run_tests():
+    """Run will message test suites"""
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    
+    # Add test classes to suite
+    suite.addTests(loader.loadTestsFromTestCase(TestWillMessageSetup))
+    suite.addTests(loader.loadTestsFromTestCase(TestWillMessageBehavior))
+    suite.addTests(loader.loadTestsFromTestCase(TestWillMessageTriggers))
+    
+    # Run tests
+    runner = unittest.TextTestRunner(verbosity=2)
+    return runner.run(suite).wasSuccessful()
+
 if __name__ == '__main__':
-    unittest.main()
+    import sys
+    import os
+    
+    # Add upper level paths
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(os.path.dirname(current_dir))
+    grandparent_dir = os.path.dirname(parent_dir)
+    sys.path.extend([parent_dir, grandparent_dir])
+    
+    sys.exit(not run_tests())

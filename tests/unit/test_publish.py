@@ -247,9 +247,10 @@ class TestDeliveryTracking(unittest.IsolatedAsyncioTestCase):
         
         # Duplicate acknowledgment should not raise error
         await self.publish_handler.handle_puback(packet_id)
- 
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+    
     # Create a test suite combining all test cases
     suite = unittest.TestSuite()
 
