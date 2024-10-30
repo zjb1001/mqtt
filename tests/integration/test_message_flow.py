@@ -3,6 +3,12 @@ from unittest.mock import Mock, patch
 import asyncio
 from datetime import datetime
 
+# add src into path, src path upper level two from this file
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
 from src.message_handler import MessageHandler, RetainedMessage
 from src.session import SessionState, QoSMessage
 from src.will_message import QoSLevel
@@ -267,4 +273,16 @@ class TestMessageFlowIntegration(unittest.TestCase):
         )
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)    
+    
+    # Create a test suite combining all test cases
+    suite = unittest.TestSuite()
+
+    suite.addTest(TestMessageFlowIntegration("test_single_publisher_multiple_subscribers"))
+    suite.addTest(TestMessageFlowIntegration("test_multiple_publishers_single_subscriber"))
+    suite.addTest(TestMessageFlowIntegration("test_session_persistence_and_message_delivery"))
+    suite.addTest(TestMessageFlowIntegration("test_mixed_qos_levels"))
+
+    # Run the test suite
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
