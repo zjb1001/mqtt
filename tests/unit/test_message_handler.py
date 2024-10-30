@@ -105,8 +105,9 @@ class TestMessageHandler(unittest.TestCase):
         }
         mock_pub_handler.return_value._get_next_packet_id.return_value = 1
         
-        # # Mock subscriber behavior
-        # mock_subscriber.return_value.send_message.return_value = True
+        # Create MessageHandler instance
+        self.message_handler.subscription_handler = mock_sub_handler.return_value
+        self.message_handler.publish_handler = mock_pub_handler.return_value
 
         # Create publish packet
         publish_packet = PublishPacket(
