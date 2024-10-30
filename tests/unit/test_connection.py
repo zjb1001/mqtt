@@ -39,14 +39,14 @@ class TestConnectPacketEncodingDecoding(unittest.TestCase):
         # Verify remaining length
         self.assertEqual(encoded[1], len(encoded) - 2)
         # Verify protocol name and level
-        self.assertEqual(encoded[2:8], b'\x00\x04MQTT\x04')
+        self.assertEqual(encoded[2:9], b'\x00\x04MQTT\x04')
         # Verify connect flags (only clean session set)
-        self.assertEqual(encoded[8], 0x02)
+        self.assertEqual(encoded[9], 0x02)
         # Verify keep alive
-        self.assertEqual(encoded[9:11], b'\x00\x3C')  # 60 seconds
+        self.assertEqual(encoded[10:12], b'\x00\x3C')  # 60 seconds
         # Verify client ID
-        self.assertEqual(encoded[11:13], b'\x00\x0B')  # Length 11
-        self.assertEqual(encoded[13:24], b'test_client')
+        self.assertEqual(encoded[12:14], b'\x00\x0B')  # Length 11
+        self.assertEqual(encoded[14:25], b'test_client')
 
     def test_encode_full_connect_packet(self):
         """Test encoding of a CONNECT packet with all optional fields"""
@@ -67,11 +67,13 @@ class TestConnectPacketEncodingDecoding(unittest.TestCase):
         
         encoded = packet.encode()
         # Verify connect flags (all flags set)
-        self.assertTrue(encoded[8] & 0x80)  # Username flag
-        self.assertTrue(encoded[8] & 0x40)  # Password flag
-        self.assertTrue(encoded[8] & 0x04)  # Will flag
-        self.assertTrue(encoded[8] & 0x20)  # Will retain
-        self.assertEqual((encoded[8] >> 3) & 0x03, QoSLevel.AT_LEAST_ONCE)  # Will QoS
+        connect_flags = encoded[9]
+
+        self.assertTrue(connect_flags & 0x80)  # Username flag
+        self.assertTrue(connect_flags & 0x40)  # Password flag
+        self.assertTrue(connect_flags & 0x04)  # Will flag
+        self.assertTrue(connect_flags & 0x20)  # Will retain
+        self.assertEqual((connect_flags >> 3) & 0x03, QoSLevel.AT_LEAST_ONCE)  # Will QoS
 
     def test_decode_connect_packet(self):
         """Test decoding of a CONNECT packet"""
@@ -144,7 +146,7 @@ class TestConnectionEstablishment(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(success)
         self.assertTrue(session_present)
         old_writer.close.assert_called_once()
-        self.assertEqual(self.connection_handler.connections["test_client"], new_writer)
+        self.assertIs(self.connection_handler.connections["test_client"], new_writer)
 
 class TestErrorHandling(unittest.IsolatedAsyncioTestCase):
     """Test suite for error handling"""

@@ -95,6 +95,7 @@ class TestMessageHandler(unittest.TestCase):
         
     @patch('src.message_handler.PublishHandler')
     @patch('src.message_handler.SubscriptionHandler')
+    # @patch('src.message_handler.Subscriber')
     def test_publish_message_routing(self, mock_sub_handler, mock_pub_handler):
         """Test routing of publish messages to subscribers"""
         # Setup mocks
@@ -104,6 +105,9 @@ class TestMessageHandler(unittest.TestCase):
         }
         mock_pub_handler.return_value._get_next_packet_id.return_value = 1
         
+        # # Mock subscriber behavior
+        # mock_subscriber.return_value.send_message.return_value = True
+
         # Create publish packet
         publish_packet = PublishPacket(
             topic="test/topic",
@@ -254,7 +258,6 @@ class TestMessageHandler(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(verbosity=2)
     # Create a test suite combining all test cases
     suite = unittest.TestSuite()
 
@@ -268,5 +271,5 @@ if __name__ == '__main__':
     suite.addTest(TestMessageHandler("test_session_message_retrieval"))
 
     # Run the test suite
-    runner = unittest.TextTestRunner()
+    runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite)
