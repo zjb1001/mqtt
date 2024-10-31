@@ -98,6 +98,12 @@ class MessageHandler:
             # Use the lower of the publish QoS and subscription QoS
             effective_qos = min(packet.qos, qos)
             
+            # Only process if client has active session
+            if client_id not in self.sessions:
+                continue
+                
+            session = self.sessions[client_id]
+
             if effective_qos > QoSLevel.AT_MOST_ONCE:
                 # Create QoS tracking message
                 qos_msg = QoSMessage(
