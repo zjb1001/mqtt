@@ -2,6 +2,12 @@ import unittest
 from unittest.mock import Mock, patch
 from datetime import datetime, timedelta
 
+# add src into path, src path upper level two from this file
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
 from src.session import SessionState, QoSMessage
 from src.will_message import QoSLevel
 
@@ -303,28 +309,25 @@ class TestSessionStateOperations(unittest.TestCase):
         self.assertFalse(serialized_data['clean_session'])
         self.assertIn("test/topic", serialized_data['subscriptions'])
 
-def run_tests():
+if __name__ == '__main__':
     """Run session test suites"""
-    loader = unittest.TestLoader()
     suite = unittest.TestSuite()
     
     # Add test classes to suite
-    suite.addTests(loader.loadTestsFromTestCase(TestSessionStateManagement))
-    suite.addTests(loader.loadTestsFromTestCase(TestQoSMessageManagement))
-    suite.addTests(loader.loadTestsFromTestCase(TestSessionStateOperations))
-    
-    # Run tests
-    runner = unittest.TextTestRunner(verbosity=2)
-    return runner.run(suite).wasSuccessful()
+    suite.addTest(TestSessionStateManagement("test_session_creation"))
+    suite.addTest(TestSessionStateManagement("test_persistent_session_creation"))
+    suite.addTest(TestSessionStateManagement("test_subscription_management"))
+    suite.addTest(TestSessionStateManagement("test_pending_message_management"))
 
-if __name__ == '__main__':
-    import sys
-    import os
+    suite.addTest(TestQoSMessageManagement("test_qos_message_creation"))
+    suite.addTest(TestQoSMessageManagement("test_qos_message_state_transitions"))
+    suite.addTest(TestQoSMessageManagement("test_qos_message_retry_tracking"))
     
-    # Add upper level paths
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(os.path.dirname(current_dir))
-    grandparent_dir = os.path.dirname(parent_dir)
-    sys.path.extend([parent_dir, grandparent_dir])
-    
-    sys.exit(not run_tests())
+    suite.addTest(TestSessionStateOperations("test_session_restoration"))
+    suite.addTest(TestSessionStateOperations("test_session_expiry"))
+    suite.addTest(TestSessionStateOperations("test_session_cleanup"))
+    suite.addTest(TestSessionStateOperations("test_session_data_persistence"))
+
+    # Run the test suite
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(suite)
