@@ -105,26 +105,53 @@ class PublishHandler:
         
         return packet_id
 
+    def __init__(self):
+        self.next_packet_id: int = 1
+        self.pending_qos_messages: Dict[int, QoSMessage] = {}
+        self.retry_interval: float = 5.0  # seconds
+        self.max_retries: int = 3
+        self.retransmit_callback = None  # Callback for retransmission
+
+    def set_retransmit_callback(self, callback):
+        """Set callback function for packet retransmission"""
+        self.retransmit_callback = callback
+
     async def _handle_qos_retry(self, packet: PublishPacket) -> None:
         """Handle QoS retry logic for QoS 1 and 2"""
         if packet.packet_id is None or packet.packet_id not in self.pending_qos_messages:
             return
         
         qos_message = self.pending_qos_messages[packet.packet_id]
-        while qos_message.retry_count < self.max_retries and not qos_message.ack_received:
+        retry_count = 0
+        
+        while retry_count < self.max_retries and not qos_message.ack_received:
+            # Initial delay before first retry
             await asyncio.sleep(self.retry_interval)
             
-            if qos_message.ack_received:
+            # Check if message was acknowledged during sleep
+            if qos_message.ack_received or packet.packet_id not in self.pending_qos_messages:
                 break
-                
-            qos_message.retry_count += 1
+            
+            # Increment retry count and update message
+            retry_count += 1
+            qos_message.retry_count = retry_count
             packet.dup = True  # Set DUP flag for retransmission
             
-            # Retransmit packet
-            # Note: Actual network transmission would be handled by a connection manager
+            # Perform actual retransmission if callback is set
+            if self.retransmit_callback:
+                try:
+                    await self.retransmit_callback(packet)
+                    qos_message.last_sent = datetime.now()
+                    qos_message.state = "RETRANSMITTED"
+                except Exception as e:
+                    print(f"Retransmission failed: {e}")
+                    qos_message.state = "RETRANSMISSION_FAILED"
+            else:
+                print("Warning: No retransmit callback set. Packet cannot be retransmitted.")
             
-        if not qos_message.ack_received:
-            # Handle failed delivery
+        # Remove message after max retries if not acknowledged
+        if not qos_message.ack_received and packet.packet_id in self.pending_qos_messages:
+            qos_message.state = "EXPIRED"
             del self.pending_qos_messages[packet.packet_id]
 
     async def handle_puback(self, packet_id: int) -> None:
