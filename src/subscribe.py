@@ -64,23 +64,47 @@ class SubscriptionHandler:
         self.sessions: Dict[str, SessionState] = {}
         
     def _split_topic(self, topic: str) -> List[str]:
-        """Split topic into segments"""
         return topic.split('/')
     
     def _add_topic_node(self, segments: List[str], client_id: str, qos: QoSLevel, node: TopicNode = None) -> None:
-        """Add topic subscription to topic tree"""
+        """Add topic subscription to topic tree and manage subscription state
+    
+        Args:
+            segments: Remaining segments of the topic filter
+            client_id: Client ID to subscribe
+            qos: QoS level for the subscription
+            node: Current node in topic tree (None for root)
+        """
+        # Initialize root node if needed
         if node is None:
             node = self.topic_tree
-            
+        
+        # Base case: empty segments
         if not segments:
             node.subscribers.add(client_id)
             node.qos_levels[client_id] = qos
             return
-            
+    
+        # Get current segment
         segment = segments[0]
+    
+        # Create new node if needed
         if segment not in node.children:
             node.children[segment] = TopicNode(segment)
-            
+    
+        # Handle wildcard subscription
+        if segment == '#':
+            # MQTT spec: '#' must be the last segment
+            node.subscribers.add(client_id)
+            node.qos_levels[client_id] = qos
+            return
+        
+        # Handle single level wildcard subscription
+        if segment == '+':
+            node.subscribers.add(client_id)
+            node.qos_levels[client_id] = qos
+        
+        # Recursive case: continue with remaining segments
         self._add_topic_node(segments[1:], client_id, qos, node.children[segment])
     
     def _match_topic(self, pattern: List[str], topic: List[str], node: TopicNode = None) -> Set[str]:
@@ -109,13 +133,53 @@ class SubscriptionHandler:
                 
         return matched_subscribers
 
+    def _validate_topic_filter(self, topic: str) -> bool:
+        """
+        Validate topic filter according to MQTT rules:
+        - Single-level wildcard (+) can be used at any level but must occupy entire level
+        - Multi-level wildcard (#) must be the last character
+        - Neither wildcard can be used within a level
+        """
+        if not topic:
+            return False
+            
+        segments = topic.split('/')
+        
+        # Check each segment
+        for i, segment in enumerate(segments):
+            # Empty segment (double slash) is invalid
+            if not segment:
+                return False
+                
+            # Check for invalid wildcard usage
+            if '+' in segment and segment != '+':
+                return False  # + must occupy entire level
+                
+            if '#' in segment:
+                if segment != '#' or i != len(segments) - 1:
+                    return False  # # must be alone and at last position
+                    
+        return True
+        
+    def _validate_qos(self, qos: int) -> bool:
+        """Validate QoS level is 0, 1, or 2"""
+        return isinstance(qos, int) and 0 <= qos <= 2
+
     async def handle_subscribe(self, client_id: str, packet: SubscribePacket) -> List[QoSLevel]:
-        """Handle SUBSCRIBE packet"""
+        """
+        Handle SUBSCRIBE packet according to MQTT protocol.
+        Returns a list of granted QoS levels or failure codes (0x80).
+        """
         return_codes = []
         
         for topic, qos in packet.topic_filters:
+            # Validate QoS level
+            if not self._validate_qos(qos):
+                return_codes.append(0x80)  # Failure
+                continue
+                
             # Validate topic filter
-            if not topic or '#' in topic[:-1] or '+' in topic and len(topic) > 1:
+            if not self._validate_topic_filter(topic):
                 return_codes.append(0x80)  # Failure
                 continue
                 
@@ -156,17 +220,15 @@ class SubscriptionHandler:
         await writer.drain()
         
     def get_matching_subscribers(self, topic: str) -> Dict[str, QoSLevel]:
-        """Get all subscribers matching a topic"""
-        topic_segments = self._split_topic(topic)
-        matched_subscribers = self._match_topic(topic_segments, topic_segments)
-        
-        # Create map of client IDs to their QoS levels
+        # """Get all subscribers matching a topic"""
+        topic_segments = topic.split('/')
         result = {}
-        for client_id in matched_subscribers:
-            # Find the most specific matching subscription for this client
-            for pattern in self.sessions[client_id].subscriptions:
-                if self._match_topic(self._split_topic(pattern), topic_segments):
-                    result[client_id] = self.sessions[client_id].subscriptions[pattern]
-                    break
-                    
+
+        # Iterate through all clients and their subscriptions
+        for client_id, session in self.sessions.items():
+            # Check each subscription pattern for matches
+            for pattern, qos in session.subscriptions.items():
+                if self._match_topic(pattern.split('/'), topic_segments):
+                    result[client_id] = qos
+
         return result
