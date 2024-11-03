@@ -231,8 +231,4 @@ class SubscriptionHandler:
                 if self._match_topic(pattern.split('/'), topic_segments):
                     result[client_id] = qos
 
-<<<<<<< HEAD
         return result
-=======
-        return result
->>>>>>> main
