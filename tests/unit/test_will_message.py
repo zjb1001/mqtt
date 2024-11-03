@@ -177,6 +177,9 @@ class TestWillMessageTriggers(unittest.TestCase):
             retain=True
         )
         
+        # Setup mock connection with the will message
+        mock_connection.will_message = will_message
+        
         # Simulate network disconnection
         mock_connection.is_connected.return_value = False
         mock_connection.last_activity = None
