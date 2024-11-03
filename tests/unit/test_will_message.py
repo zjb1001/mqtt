@@ -237,115 +237,195 @@ class TestWillMessageTriggers(unittest.TestCase):
             retain=True
         )
         
-    @patch('src.connection.ConnectionHandler')
-    def test_network_disconnection_trigger(self, mock_connection_class):
+    async def test_network_disconnection_trigger(self):
         """Test will message trigger on network disconnection"""
-        # Setup mock connection instance
-        mock_connection = mock_connection_class.return_value
-        mock_connection.will_message = self.will_message
+        # Setup connection handler with will message
+        handler = ConnectionHandler()
+        client_id = "test_client"
         
-        # Mock the internal state and behavior
-        mock_connection.is_connected.return_value = False
-        mock_connection.last_activity = timedelta(seconds=60)
-        mock_connection.keep_alive_interval = 30
+        # Create a mock StreamWriter
+        mock_writer = Mock()
+        mock_writer.close = Mock()
+        mock_writer.wait_closed = AsyncMock()
         
-        # Create the actual connection handler
-        connection_handler = ConnectionHandler()
+        # Register client with will message
+        handler.connections[client_id] = mock_writer
+        handler.will_messages[client_id] = self.will_message
         
-        # Act - simulate network disconnection scenario
-        actual_should_send = connection_handler.should_send_will()
-        actual_will_message = connection_handler.get_will_message()
+        # Mock message handler for will message verification
+        handler.message_handler = Mock()
+        handler.message_handler._handle_publish = AsyncMock()
         
-        # Assert
-        self.assertTrue(actual_should_send, "Will message should be triggered on network disconnect")
-        self.assertEqual(actual_will_message, self.will_message)
+        # Trigger unexpected disconnection
+        await handler.handle_client_disconnect(client_id, unexpected=True)
         
-        # Verify the correct methods were called with expected parameters
-        mock_connection.is_connected.assert_called_once()
-        self.assertEqual(mock_connection.is_connected.call_count, 1)
+        # Verify will message was processed
+        self.assertIn(
+            call._handle_publish.call_args[0][0].topic,
+            self.will_message.topic,
+            "Will message topic not matched"
+        )
+        self.assertIn(
+            call._handle_publish.call_args[0][0].payload,
+            self.will_message.payload,
+            "Will message payload not matched"
+        )
+        
+        # Verify connection cleanup
+        mock_writer.close.assert_called_once()
+        mock_writer.wait_closed.assert_called_once()
+        self.assertNotIn(client_id, handler.connections)
+        self.assertNotIn(client_id, handler.will_messages)
 
-    @patch('src.connection.ConnectionHandler')
-    def test_no_will_message_when_connected(self, mock_connection_class):
-        """Test will message should not trigger when network is connected"""
-        # Setup
-        mock_connection = mock_connection_class.return_value
-        mock_connection.will_message = self.will_message
-        mock_connection.is_connected.return_value = True
-        mock_connection.last_activity = timedelta(seconds=1)
+    async def test_no_will_message_on_clean_disconnect(self):
+        """Test will message should not trigger on clean disconnect"""
+        # Setup connection handler
+        handler = ConnectionHandler()
+        client_id = "test_client"
         
-        connection_handler = ConnectionHandler()
+        # Create a mock StreamWriter
+        mock_writer = Mock()
+        mock_writer.close = Mock()
+        mock_writer.wait_closed = AsyncMock()
         
-        # Act
-        actual_should_send = connection_handler.should_send_will()
+        # Register client with will message
+        handler.connections[client_id] = mock_writer
+        handler.will_messages[client_id] = self.will_message
         
-        # Assert
-        self.assertFalse(actual_should_send, "Will message should not trigger when connected")
-        mock_connection.is_connected.assert_called_once()
+        # Mock message handler
+        handler.message_handler = Mock()
+        handler.message_handler._handle_publish = AsyncMock()
+        
+        # Trigger clean disconnection
+        await handler.handle_client_disconnect(client_id, unexpected=False)
+        
+        # Verify will message was not processed
+        handler.message_handler._handle_publish.assert_not_called()
+        
+        # Verify connection cleanup still occurred
+        mock_writer.close.assert_called_once()
+        mock_writer.wait_closed.assert_called_once()
+        self.assertNotIn(client_id, handler.connections)
 
-    @patch('src.connection.ConnectionHandler')
-    def test_will_message_on_keep_alive_timeout(self, mock_connection_class):
+    async def test_will_message_on_keep_alive_timeout(self):
         """Test will message trigger on keep alive timeout"""
-        # Setup
-        mock_connection = mock_connection_class.return_value
-        mock_connection.will_message = self.will_message
-        mock_connection.is_connected.return_value = True
-        mock_connection.last_activity =timedelta(seconds=45)
-        mock_connection.keep_alive_interval = 30
+        # Setup connection handler
+        handler = ConnectionHandler()
+        client_id = "test_client"
+        keep_alive = 2  # Short timeout for testing
         
-        connection_handler = ConnectionHandler()
+        # Create a mock StreamWriter
+        mock_writer = Mock()
+        mock_writer.close = Mock()
+        mock_writer.wait_closed = AsyncMock()
         
-        # Act
-        actual_should_send = connection_handler.should_send_will()
+        # Register client with will message
+        handler.connections[client_id] = mock_writer
+        handler.will_messages[client_id] = self.will_message
         
-        # Assert
-        self.assertTrue(actual_should_send, "Will message should trigger on keep alive timeout")
-        mock_connection.is_connected.assert_called_once()
-
-    @patch('src.connection.ConnectionHandler')
-    def test_client_timeout_trigger(self, mock_connection):
-        """Test will message trigger on client timeout"""
-        will_message = WillMessage(
-            topic="test/timeout",
-            payload=b"client timeout",
-            qos=QoSLevel.EXACTLY_ONCE,
-            retain=False,
-            delay_interval=30
+        # Mock message handler
+        handler.message_handler = Mock()
+        handler.message_handler._handle_publish = AsyncMock()
+        
+        # Start keep-alive monitoring
+        monitor_task = asyncio.create_task(
+            handler._monitor_keep_alive(client_id, keep_alive)
         )
-
-        # Setup mock connection with the will message
-        mock_connection.will_message = will_message
         
-        # Simulate client timeout
-        mock_connection.keepalive = 60
-        mock_connection.last_activity = timedelta(seconds=90)
+        # Wait for timeout and monitoring to complete
+        await asyncio.sleep(keep_alive * 1.5 + 0.1)  # Wait slightly longer than timeout
+        await monitor_task
         
-        # Verify will message would be triggered
-        self.assertTrue(mock_connection.should_send_will())
-        self.assertEqual(mock_connection.will_message, will_message)
+        # Verify will message was processed
+        handler.message_handler._handle_publish.assert_called_once()
+        publish_packet = handler.message_handler._handle_publish.call_args[0][0]
+        self.assertEqual(publish_packet.topic, self.will_message.topic)
+        self.assertEqual(publish_packet.payload, self.will_message.payload)
+        
+        # Verify connection cleanup
+        mock_writer.close.assert_called_once()
+        mock_writer.wait_closed.assert_called_once()
+        self.assertNotIn(client_id, handler.connections)
 
-    @patch('src.connection.ConnectionHandler')
-    def test_clean_disconnect_handling(self, mock_connection_class):
-        """Test will message handling during clean disconnect"""
-        mock_connection = mock_connection_class.return_value
-        will_message = WillMessage(
-            topic="test/clean/disconnect",
-            payload=b"clean disconnect",
-            qos=QoSLevel.AT_MOST_ONCE,
-            retain=False
+    async def test_will_message_session_cleanup(self):
+        """Test will message and session cleanup after disconnection"""
+        # Setup connection handler
+        handler = ConnectionHandler()
+        client_id = "test_client"
+        
+        # Create session state
+        handler.session_states[client_id] = SessionState(
+            client_id=client_id,
+            clean_session=True,
+            subscriptions={},
+            pending_messages={},
+            timestamp=datetime.now()
         )
+        
+        # Create a mock StreamWriter
+        mock_writer = Mock()
+        mock_writer.close = Mock()
+        mock_writer.wait_closed = AsyncMock()
+        
+        # Register client with will message
+        handler.connections[client_id] = mock_writer
+        handler.will_messages[client_id] = self.will_message
+        
+        # Mock message handler
+        handler.message_handler = Mock()
+        handler.message_handler._handle_publish = AsyncMock()
+        
+        # Trigger unexpected disconnection
+        await handler.handle_client_disconnect(client_id, unexpected=True)
+        
+        # Verify complete cleanup
+        self.assertNotIn(client_id, handler.connections)
+        self.assertNotIn(client_id, handler.will_messages)
+        self.assertNotIn(client_id, handler.session_states)
 
-        # Setup mock connection with the will message
-        mock_connection.will_message = will_message
-        mock_connection.should_send_will.return_value = False
+    async def test_will_message_with_retained_session(self):
+        """Test will message handling with retained session state"""
+        # Setup connection handler
+        handler = ConnectionHandler()
+        client_id = "test_client"
         
-        # Simulate clean disconnect
-        mock_connection.disconnect(clean=True)
+        # Create session state with clean_session=False
+        handler.session_states[client_id] = SessionState(
+            client_id=client_id,
+            clean_session=False,  # Retained session
+            subscriptions={},
+            pending_messages={},
+            timestamp=datetime.now()
+        )
         
-        # Verify will message should not be triggered
-        self.assertFalse(mock_connection.should_send_will())
+        # Create a mock StreamWriter
+        mock_writer = Mock()
+        mock_writer.close = Mock()
+        mock_writer.wait_closed = AsyncMock()
+        
+        # Register client with will message
+        handler.connections[client_id] = mock_writer
+        handler.will_messages[client_id] = self.will_message
+        
+        # Mock message handler
+        handler.message_handler = Mock()
+        handler.message_handler._handle_publish = AsyncMock()
+        
+        # Trigger unexpected disconnection
+        await handler.handle_client_disconnect(client_id, unexpected=True)
+        
+        # Verify will message processed but session retained
+        handler.message_handler._handle_publish.assert_called_once()
+        self.assertNotIn(client_id, handler.connections)
+        self.assertNotIn(client_id, handler.will_messages)
+        self.assertIn(client_id, handler.session_states)  # Session should be retained
 
 if __name__ == '__main__':
     """Run will message test suites"""
+    
+    # Create event loop for async tests
+    loop = asyncio.get_event_loop()
+    
     suite = unittest.TestSuite()
     
     # Add test classes to suite
@@ -359,10 +439,22 @@ if __name__ == '__main__':
     suite.addTest(TestWillMessageBehavior("test_topic_validation"))
     suite.addTest(TestWillMessageBehavior("test_invalid_will_message_creation"))
 
+    # Add improved trigger tests
     suite.addTest(TestWillMessageTriggers("test_network_disconnection_trigger"))
-    suite.addTest(TestWillMessageTriggers("test_client_timeout_trigger"))
-    suite.addTest(TestWillMessageTriggers("test_clean_disconnect_handling"))
+    suite.addTest(TestWillMessageTriggers("test_no_will_message_on_clean_disconnect"))
+    suite.addTest(TestWillMessageTriggers("test_will_message_on_keep_alive_timeout"))
+    suite.addTest(TestWillMessageTriggers("test_will_message_session_cleanup"))
+    suite.addTest(TestWillMessageTriggers("test_will_message_with_retained_session"))
 
     # Run tests
     runner = unittest.TextTestRunner(verbosity=2)
-    runner.run(suite).wasSuccessful()
+    result = runner.run(suite)
+    
+    # Run async tests
+    loop.run_until_complete(asyncio.gather(*[
+        test._callTestMethod() 
+        for test in suite._tests 
+        if asyncio.iscoroutinefunction(getattr(test, test._testMethodName))
+    ]))
+    
+    loop.close()
