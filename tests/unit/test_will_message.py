@@ -211,8 +211,9 @@ class TestWillMessageTriggers(unittest.TestCase):
         self.assertEqual(mock_connection.will_message, will_message)
 
     @patch('src.connection.ConnectionHandler')
-    def test_clean_disconnect_handling(self, mock_connection):
+    def test_clean_disconnect_handling(self, mock_connection_class):
         """Test will message handling during clean disconnect"""
+        mock_connection = mock_connection_class.return_value
         will_message = WillMessage(
             topic="test/clean/disconnect",
             payload=b"clean disconnect",
@@ -222,6 +223,7 @@ class TestWillMessageTriggers(unittest.TestCase):
 
         # Setup mock connection with the will message
         mock_connection.will_message = will_message
+        mock_connection.should_send_will.return_value = False
         
         # Simulate clean disconnect
         mock_connection.disconnect(clean=True)
