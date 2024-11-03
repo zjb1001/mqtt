@@ -93,6 +93,30 @@ class TestWillMessageSetup(unittest.TestCase):
                 retain=False
             )
             self.assertIsInstance(will.qos, QoSLevel)
+            
+    def test_will_message_verify_content(self):
+        """Test will message content verification"""
+        test_topic = "test/verify/content"
+        test_payload = b"test payload"
+        
+        # Create will message with specific content
+        will = WillMessage(
+            topic=test_topic,
+            payload=test_payload,
+            qos=QoSLevel.AT_LEAST_ONCE,
+            retain=True,
+            delay_interval=30
+        )
+        
+        # Verify each field matches expected values
+        self.assertEqual(will.topic, test_topic, "Topic does not match")
+        self.assertEqual(will.payload, test_payload, "Payload does not match")
+        self.assertEqual(will.qos, QoSLevel.AT_LEAST_ONCE, "QoS level does not match")
+        self.assertTrue(will.retain, "Retain flag does not match")
+        self.assertEqual(will.delay_interval, 30, "Delay interval does not match")
+        
+        # Verify payload type is bytes
+        self.assertIsInstance(will.payload, bytes, "Payload should be bytes type")
 
 class TestWillMessageBehavior(unittest.TestCase):
     """Test suite for will message behavior and triggers"""
@@ -169,6 +193,36 @@ class TestWillMessageBehavior(unittest.TestCase):
                 payload=b"test",
                 qos=QoSLevel.AT_MOST_ONCE,
                 retain=False
+            )
+            
+    def test_invalid_will_message_creation(self):
+        """Test invalid will message creation scenarios"""
+        # Test with invalid QoS level
+        with self.assertRaises(ValueError):
+            WillMessage(
+                topic="test/invalid",
+                payload=b"test",
+                qos=99,  # Invalid QoS value
+                retain=False
+            )
+            
+        # Test with non-bytes payload
+        with self.assertRaises(TypeError):
+            WillMessage(
+                topic="test/invalid",
+                payload="string payload",  # Should be bytes
+                qos=QoSLevel.AT_MOST_ONCE,
+                retain=False
+            )
+            
+        # Test with invalid delay interval type
+        with self.assertRaises(TypeError):
+            WillMessage(
+                topic="test/invalid",
+                payload=b"test",
+                qos=QoSLevel.AT_MOST_ONCE,
+                retain=False,
+                delay_interval="30"  # Should be int
             )
 
 class TestWillMessageTriggers(unittest.TestCase):
@@ -295,14 +349,15 @@ if __name__ == '__main__':
     suite = unittest.TestSuite()
     
     # Add test classes to suite
-    # suite.addTest(TestWillMessageSetup("test_will_message_creation"))
-    # suite.addTest(TestWillMessageSetup("test_will_message_default_values"))
-    # suite.addTest(TestWillMessageSetup("test_will_message_payload_types"))
-    # suite.addTest(TestWillMessageSetup("test_qos_level_validation"))
+    suite.addTest(TestWillMessageSetup("test_will_message_creation"))
+    suite.addTest(TestWillMessageSetup("test_will_message_default_values"))
+    suite.addTest(TestWillMessageSetup("test_will_message_payload_types"))
+    suite.addTest(TestWillMessageSetup("test_qos_level_validation"))
+    suite.addTest(TestWillMessageSetup("test_will_message_verify_content"))
 
-    # suite.addTest(TestWillMessageBehavior("test_will_message_immutability"))
     suite.addTest(TestWillMessageBehavior("test_will_delay_interval_bounds"))
     suite.addTest(TestWillMessageBehavior("test_topic_validation"))
+    suite.addTest(TestWillMessageBehavior("test_invalid_will_message_creation"))
 
     suite.addTest(TestWillMessageTriggers("test_network_disconnection_trigger"))
     suite.addTest(TestWillMessageTriggers("test_client_timeout_trigger"))
