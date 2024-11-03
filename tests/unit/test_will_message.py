@@ -232,7 +232,7 @@ if __name__ == '__main__':
 
     # suite.addTest(TestWillMessageBehavior("test_will_message_immutability"))
     suite.addTest(TestWillMessageBehavior("test_will_delay_interval_bounds"))
-    # suite.addTest(TestWillMessageBehavior("test_topic_validation"))
+    suite.addTest(TestWillMessageBehavior("test_topic_validation"))
 
     # suite.addTest(TestWillMessageTriggers("test_network_disconnection_trigger"))
     # suite.addTest(TestWillMessageTriggers("test_client_timeout_trigger"))
