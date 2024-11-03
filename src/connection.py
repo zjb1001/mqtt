@@ -97,10 +97,14 @@ class ConnectionHandler:
     def __init__(self):
         self.connections: Dict[str, asyncio.StreamWriter] = {}
         self.session_states: Dict[str, 'SessionState'] = {}
+        self.will_messages: Dict[str, WillMessage] = {}  # Store client will messages
 
     async def handle_new_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         """Handle incoming connection from client"""
         try:
+            # Start keep-alive monitoring task
+            keep_alive_task = None
+            
             # Read CONNECT packet
             first_byte = await reader.read(1)
             if not first_byte or first_byte[0] >> 4 != MessageType.CONNECT:
@@ -129,6 +133,11 @@ class ConnectionHandler:
 
             if success:
                 self.connections[connect_packet.client_id] = writer
+                # Start keep-alive monitoring if keep_alive > 0
+                if connect_packet.keep_alive > 0:
+                    keep_alive_task = asyncio.create_task(
+                        self._monitor_keep_alive(connect_packet.client_id, connect_packet.keep_alive)
+                    )
 
         except Exception as e:
             print(f"Connection error: {e}")
@@ -239,8 +248,35 @@ class ConnectionHandler:
                 pending_messages={},
                 timestamp=datetime.now()
             )
+            
+        # Store will message if present
+        if packet.will_message:
+            self.will_messages[packet.client_id] = packet.will_message
+        else:
+            self.will_messages.pop(packet.client_id, None)
         
         return True, session_present
+
+    async def _monitor_keep_alive(self, client_id: str, keep_alive: int) -> None:
+        """Monitor client keep-alive timeout"""
+        timeout = keep_alive * 1.5  # MQTT spec suggests 1.5 times keep-alive
+        
+        while client_id in self.connections:
+            try:
+                # Wait for keep-alive interval
+                await asyncio.sleep(timeout)
+                
+                # Check if client is still connected
+                if client_id in self.connections:
+                    # Handle timeout - trigger will message and disconnect
+                    await self.handle_client_disconnect(client_id, unexpected=True)
+                    break
+                    
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"Keep-alive monitoring error for {client_id}: {e}")
+                break
 
     async def _send_connack(self, writer: asyncio.StreamWriter, success: bool, session_present: bool) -> None:
         """Send CONNACK packet"""
@@ -249,3 +285,42 @@ class ConnectionHandler:
         packet.append(0 if success else 1)  # Connect return code
         writer.write(bytes(packet))
         await writer.drain()
+
+    async def handle_client_disconnect(self, client_id: str, unexpected: bool = True) -> None:
+        """Handle client disconnection and trigger will message if needed"""
+        if unexpected and client_id in self.will_messages:
+            await self._process_will_message(client_id)
+            
+        # Cleanup connection
+        if client_id in self.connections:
+            writer = self.connections[client_id]
+            writer.close()
+            await writer.wait_closed()
+            del self.connections[client_id]
+            
+        # Clean session if needed
+        if client_id in self.session_states and self.session_states[client_id].clean_session:
+            del self.session_states[client_id]
+            self.will_messages.pop(client_id, None)
+
+    async def _process_will_message(self, client_id: str) -> None:
+        """Process and publish will message for disconnected client"""
+        will_message = self.will_messages.get(client_id)
+        if not will_message:
+            return
+            
+        # Create publish packet for will message
+        from .publish import PublishPacket
+        will_packet = PublishPacket(
+            topic=will_message.topic,
+            payload=will_message.payload,
+            qos=will_message.qos,
+            retain=will_message.retain
+        )
+        
+        # Use message handler to distribute will message
+        if hasattr(self, 'message_handler'):
+            await self.message_handler._handle_publish(will_packet)
+            
+        # Remove will message after sending
+        del self.will_messages[client_id]
