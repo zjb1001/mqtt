@@ -13,3 +13,7 @@ class WillMessage:
     qos: QoSLevel
     retain: bool
     delay_interval: int = 0  # MQTT 5.0 feature
+
+    def __post_init__(self):
+        if self.delay_interval < 0:
+            raise ValueError("Will delay interval cannot be negative")
