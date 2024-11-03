@@ -17,3 +17,9 @@ class WillMessage:
     def __post_init__(self):
         if self.delay_interval < 0:
             raise ValueError("Will delay interval cannot be negative")
+            
+        if not self.topic:
+            raise ValueError("Will topic cannot be empty")
+            
+        if '+' in self.topic or '#' in self.topic:
+            raise ValueError("Will topic cannot contain wildcards (+ or #)")
