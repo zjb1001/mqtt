@@ -66,22 +66,6 @@ class SubscriptionHandler:
     def _split_topic(self, topic: str) -> List[str]:
         return topic.split('/')
     
-    # def _add_topic_node(self, segments: List[str], client_id: str, qos: QoSLevel, node: TopicNode = None) -> None:
-    #     """Add topic subscription to topic tree"""
-    #     if node is None:
-    #         node = self.topic_tree
-            
-    #     if not segments:
-    #         node.subscribers.add(client_id)
-    #         node.qos_levels[client_id] = qos
-    #         return
-            
-    #     segment = segments[0]
-    #     if segment not in node.children:
-    #         node.children[segment] = TopicNode(segment)
-            
-    #     self._add_topic_node(segments[1:], client_id, qos, node.children[segment])
-
     def _add_topic_node(self, segments: List[str], client_id: str, qos: QoSLevel, node: TopicNode = None) -> None:
         """Add topic subscription to topic tree and manage subscription state
     
