@@ -1,6 +1,7 @@
 import unittest
-from datetime import timedelta
-from unittest.mock import Mock, patch
+import asyncio
+from datetime import timedelta, datetime
+from unittest.mock import Mock, patch, AsyncMock, call
 
 # add src into path, src path upper level two from this file
 import sys
@@ -9,6 +10,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from src.will_message import WillMessage, QoSLevel
+from src.session import SessionState
 from src.connection import (
     ConnectionHandler,
     ConnectPacket,
