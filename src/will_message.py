@@ -23,3 +23,9 @@ class WillMessage:
             
         if '+' in self.topic or '#' in self.topic:
             raise ValueError("Will topic cannot contain wildcards (+ or #)")
+            
+        if not isinstance(self.qos, QoSLevel):
+            try:
+                self.qos = QoSLevel(self.qos)
+            except ValueError:
+                raise ValueError(f"Invalid QoS value: {self.qos}. Must be 0, 1, or 2")

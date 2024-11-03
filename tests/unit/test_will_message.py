@@ -199,12 +199,21 @@ class TestWillMessageBehavior(unittest.TestCase):
             
     def test_invalid_will_message_creation(self):
         """Test invalid will message creation scenarios"""
-        # Test with invalid QoS level
+        # Test with invalid QoS level (too high)
         with self.assertRaises(ValueError):
             WillMessage(
                 topic="test/invalid",
                 payload=b"test",
                 qos=99,  # Invalid QoS value
+                retain=False
+            )
+            
+        # Test with invalid QoS level (negative)
+        with self.assertRaises(ValueError):
+            WillMessage(
+                topic="test/invalid",
+                payload=b"test",
+                qos=-1,  # Invalid QoS value
                 retain=False
             )
             
