@@ -9,6 +9,13 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from src.will_message import WillMessage, QoSLevel
+from src.connection import (
+    ConnectionHandler,
+    ConnectPacket,
+    MessageType,
+    FixedHeader,
+    ConnectFlags
+)
 
 class TestWillMessageSetup(unittest.TestCase):
     """Test suite for MQTT will message setup and properties"""
@@ -167,26 +174,78 @@ class TestWillMessageBehavior(unittest.TestCase):
 class TestWillMessageTriggers(unittest.TestCase):
     """Test suite for will message trigger conditions"""
 
-    @patch('src.connection.ConnectionHandler')
-    def test_network_disconnection_trigger(self, mock_connection):
-        """Test will message trigger on network disconnection"""
-        will_message = WillMessage(
+    def setUp(self):
+        """Setup test fixtures before each test method"""
+        self.will_message = WillMessage(
             topic="test/network/disconnect",
             payload=b"network disconnected",
             qos=QoSLevel.AT_LEAST_ONCE,
             retain=True
         )
         
-        # Setup mock connection with the will message
-        mock_connection.will_message = will_message
+    @patch('src.connection.ConnectionHandler')
+    def test_network_disconnection_trigger(self, mock_connection_class):
+        """Test will message trigger on network disconnection"""
+        # Setup mock connection instance
+        mock_connection = mock_connection_class.return_value
+        mock_connection.will_message = self.will_message
         
-        # Simulate network disconnection
+        # Mock the internal state and behavior
         mock_connection.is_connected.return_value = False
-        mock_connection.last_activity = None
+        mock_connection.last_activity = timedelta(seconds=60)
+        mock_connection.keep_alive_interval = 30
         
-        # Verify will message would be triggered
-        self.assertTrue(mock_connection.should_send_will())
-        self.assertEqual(mock_connection.will_message, will_message)
+        # Create the actual connection handler
+        connection_handler = ConnectionHandler()
+        
+        # Act - simulate network disconnection scenario
+        actual_should_send = connection_handler.should_send_will()
+        actual_will_message = connection_handler.get_will_message()
+        
+        # Assert
+        self.assertTrue(actual_should_send, "Will message should be triggered on network disconnect")
+        self.assertEqual(actual_will_message, self.will_message)
+        
+        # Verify the correct methods were called with expected parameters
+        mock_connection.is_connected.assert_called_once()
+        self.assertEqual(mock_connection.is_connected.call_count, 1)
+
+    @patch('src.connection.ConnectionHandler')
+    def test_no_will_message_when_connected(self, mock_connection_class):
+        """Test will message should not trigger when network is connected"""
+        # Setup
+        mock_connection = mock_connection_class.return_value
+        mock_connection.will_message = self.will_message
+        mock_connection.is_connected.return_value = True
+        mock_connection.last_activity = timedelta(seconds=1)
+        
+        connection_handler = ConnectionHandler()
+        
+        # Act
+        actual_should_send = connection_handler.should_send_will()
+        
+        # Assert
+        self.assertFalse(actual_should_send, "Will message should not trigger when connected")
+        mock_connection.is_connected.assert_called_once()
+
+    @patch('src.connection.ConnectionHandler')
+    def test_will_message_on_keep_alive_timeout(self, mock_connection_class):
+        """Test will message trigger on keep alive timeout"""
+        # Setup
+        mock_connection = mock_connection_class.return_value
+        mock_connection.will_message = self.will_message
+        mock_connection.is_connected.return_value = True
+        mock_connection.last_activity =timedelta(seconds=45)
+        mock_connection.keep_alive_interval = 30
+        
+        connection_handler = ConnectionHandler()
+        
+        # Act
+        actual_should_send = connection_handler.should_send_will()
+        
+        # Assert
+        self.assertTrue(actual_should_send, "Will message should trigger on keep alive timeout")
+        mock_connection.is_connected.assert_called_once()
 
     @patch('src.connection.ConnectionHandler')
     def test_client_timeout_trigger(self, mock_connection):
