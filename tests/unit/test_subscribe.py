@@ -422,23 +422,23 @@ if __name__ == "__main__":
     suite = unittest.TestSuite()
     
     # # Add test classes to suite
-    # suite.addTest(TestInternalTopicMatching("test_internal_add_topic_node"))
+    suite.addTest(TestInternalTopicMatching("test_internal_add_topic_node"))
 
-    # suite.addTest(TestPublicTopicMatching("test_exact_topic_match"))
-    # suite.addTest(TestPublicTopicMatching("test_single_level_wildcard_match"))
-    # suite.addTest(TestPublicTopicMatching("test_multi_level_wildcard_match"))
-    # suite.addTest(TestPublicTopicMatching("test_nested_topic_structure"))
+    suite.addTest(TestPublicTopicMatching("test_exact_topic_match"))
+    suite.addTest(TestPublicTopicMatching("test_single_level_wildcard_match"))
+    suite.addTest(TestPublicTopicMatching("test_multi_level_wildcard_match"))
+    suite.addTest(TestPublicTopicMatching("test_nested_topic_structure"))
 
-    # suite.addTest(TestPublicSubscriptionManagement("test_basic_subscription_handling"))
+    suite.addTest(TestPublicSubscriptionManagement("test_basic_subscription_handling"))
     suite.addTest(TestPublicSubscriptionManagement("test_multiple_topic_subscription"))
-    # suite.addTest(TestPublicSubscriptionManagement("test_duplicate_subscription_handling"))
-    # suite.addTest(TestPublicSubscriptionManagement("test_invalid_subscription_handling"))
-    # suite.addTest(TestPublicSubscriptionManagement("test_subscription_cleanup"))
-    # suite.addTest(TestPublicSubscriptionManagement("test_wildcard_subscription_matching"))
+    suite.addTest(TestPublicSubscriptionManagement("test_duplicate_subscription_handling"))
+    suite.addTest(TestPublicSubscriptionManagement("test_invalid_subscription_handling"))
+    suite.addTest(TestPublicSubscriptionManagement("test_subscription_cleanup"))
+    suite.addTest(TestPublicSubscriptionManagement("test_wildcard_subscription_matching"))
 
-    # suite.addTest(TestSubscribePacketHandling("test_subscribe_packet_encoding"))
-    # suite.addTest(TestSubscribePacketHandling("test_handle_subscribe_packet"))
-    # suite.addTest(TestSubscribePacketHandling("test_suback_generation"))
+    suite.addTest(TestSubscribePacketHandling("test_subscribe_packet_encoding"))
+    suite.addTest(TestSubscribePacketHandling("test_handle_subscribe_packet"))
+    suite.addTest(TestSubscribePacketHandling("test_suback_generation"))
 
     # Run tests
     runner = unittest.TextTestRunner(verbosity=2)
