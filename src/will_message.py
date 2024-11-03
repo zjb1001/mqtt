@@ -15,6 +15,12 @@ class WillMessage:
     delay_interval: int = 0  # MQTT 5.0 feature
 
     def __post_init__(self):
+        if not isinstance(self.payload, bytes):
+            raise TypeError("Payload must be bytes type")
+            
+        if not isinstance(self.delay_interval, int):
+            raise TypeError("Delay interval must be integer type")
+            
         if self.delay_interval < 0:
             raise ValueError("Will delay interval cannot be negative")
             

@@ -462,10 +462,14 @@ if __name__ == '__main__':
     result = runner.run(suite)
     
     # Run async tests
-    loop.run_until_complete(asyncio.gather(*[
-        test._callTestMethod() 
-        for test in suite._tests 
-        if asyncio.iscoroutinefunction(getattr(test, test._testMethodName))
-    ]))
+    async_tests = []
+    for test in suite._tests:
+        if test and hasattr(test, '_testMethodName'):
+            method = getattr(test, test._testMethodName)
+            if asyncio.iscoroutinefunction(method):
+                async_tests.append(test._callTestMethod())
+    
+    if async_tests:
+        loop.run_until_complete(asyncio.gather(*async_tests))
     
     loop.close()
