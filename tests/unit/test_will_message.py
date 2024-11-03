@@ -198,6 +198,9 @@ class TestWillMessageTriggers(unittest.TestCase):
             retain=False,
             delay_interval=30
         )
+
+        # Setup mock connection with the will message
+        mock_connection.will_message = will_message
         
         # Simulate client timeout
         mock_connection.keepalive = 60
@@ -216,6 +219,9 @@ class TestWillMessageTriggers(unittest.TestCase):
             qos=QoSLevel.AT_MOST_ONCE,
             retain=False
         )
+
+        # Setup mock connection with the will message
+        mock_connection.will_message = will_message
         
         # Simulate clean disconnect
         mock_connection.disconnect(clean=True)
@@ -238,8 +244,8 @@ if __name__ == '__main__':
     suite.addTest(TestWillMessageBehavior("test_topic_validation"))
 
     suite.addTest(TestWillMessageTriggers("test_network_disconnection_trigger"))
-    # suite.addTest(TestWillMessageTriggers("test_client_timeout_trigger"))
-    # suite.addTest(TestWillMessageTriggers("test_clean_disconnect_handling"))
+    suite.addTest(TestWillMessageTriggers("test_client_timeout_trigger"))
+    suite.addTest(TestWillMessageTriggers("test_clean_disconnect_handling"))
 
     # Run tests
     runner = unittest.TextTestRunner(verbosity=2)
