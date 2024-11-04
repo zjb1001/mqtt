@@ -81,7 +81,7 @@ class TestQoSScenarios(unittest.TestCase):
         
         # Process message
         # Publish message from client1
-        await self.message_handler._handle_publish(publish_packet, self.client1_id)
+        await self.message_handler._handle_publish(publish_packet)
         
         # Verify delivery behavior
         self.client2_writer.write.assert_called_once()
@@ -104,7 +104,7 @@ class TestQoSScenarios(unittest.TestCase):
         )
         
         # Process initial message
-        await self.message_handler._handle_publish(publish_packet, self.client1_id)
+        await self.message_handler._handle_publish(publish_packet)
         
         # Verify message is stored in session
         self.assertIn(1, self.session2.pending_messages)
@@ -134,7 +134,7 @@ class TestQoSScenarios(unittest.TestCase):
         )
         
         # Process message
-        await self.message_handler._handle_publish(publish_packet, self.client1_id)
+        await self.message_handler._handle_publish(publish_packet)
         
         # Wait briefly for message to be stored
         await asyncio.sleep(0.1)
@@ -171,7 +171,7 @@ class TestQoSScenarios(unittest.TestCase):
         )
         
         # Process initial message
-        await self.message_handler._handle_publish(publish_packet, self.client1_id)
+        await self.message_handler._handle_publish(publish_packet)
         
         # Verify message is stored
         self.assertIn(1, self.session2.pending_messages)
