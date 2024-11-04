@@ -246,7 +246,7 @@ class TestMessageFlowIntegration(unittest.TestCase):
         test_topic = "test/topic"
 
         # Create sessions with different QoS levels
-        self.message_handler.sessions = {
+        sessions = {
             publisher_id: SessionState(
                 client_id=publisher_id,
                 clean_session=True,
@@ -276,6 +276,10 @@ class TestMessageFlowIntegration(unittest.TestCase):
                 timestamp=datetime.now()
             )
         }
+        
+        # Set sessions to both handlers
+        self.message_handler.sessions = sessions
+        self.message_handler.subscription_handler.sessions = sessions
 
         # Publish QoS 2 message
         publish_packet = PublishPacket(
