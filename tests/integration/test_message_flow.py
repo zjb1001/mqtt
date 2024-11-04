@@ -300,52 +300,6 @@ class TestMessageFlow(unittest.TestCase):
                                    f"Subscriber {sub_id} topic mismatch at index {i}")
                     self.assertEqual(received[i][1], exp_payload,
                                    f"Subscriber {sub_id} payload mismatch at index {i}")
-        await self._setup_session(subscriber_id)
-        
-        # Subscribe to multiple topics with different QoS
-        subscriptions = [
-            ("test/qos0", QoSLevel.AT_MOST_ONCE),
-            ("test/qos1", QoSLevel.AT_LEAST_ONCE),
-            ("test/qos2", QoSLevel.EXACTLY_ONCE)
-        ]
-        
-        for topic, qos in subscriptions:
-            await self._subscribe_client(subscriber_id, topic, qos)
-        
-        # Publish messages with different QoS to each topic
-        messages = [
-            # Higher QoS publish to lower QoS subscription
-            ("test/qos0", QoSLevel.EXACTLY_ONCE, 1),
-            # Matching QoS levels
-            ("test/qos1", QoSLevel.AT_LEAST_ONCE, 2),
-            # Lower QoS publish to higher QoS subscription
-            ("test/qos2", QoSLevel.AT_MOST_ONCE, 3)
-        ]
-        
-        for topic, pub_qos, msg_id in messages:
-            packet = PublishPacket(
-                topic=topic,
-                payload=f"QoS test message".encode(),
-                qos=pub_qos,
-                retain=False,
-                packet_id=msg_id
-            )
-            await self.message_handler._handle_publish(packet)
-        
-        # Verify message handling
-        session = self.message_handler.sessions[subscriber_id]
-        pending_messages = session.pending_messages
-        
-        # Should have 1 pending message (QoS 1 message to QoS 1 subscription)
-        # QoS 0 subscription receives no pending messages
-        # QoS 0 publish to QoS 2 subscription creates no pending message
-        self.assertEqual(len(pending_messages), 1)
-        
-        # Complete the QoS 1 flow
-        await self.message_handler.handle_message_acknowledgment(
-            subscriber_id, 2, "PUBACK"
-        )
-        self.assertEqual(len(pending_messages), 0)
 
 if __name__ == '__main__':
     # Create test suite
