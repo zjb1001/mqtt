@@ -23,6 +23,13 @@ class TestMessageFlowIntegration(unittest.TestCase):
         self.message_handler = MessageHandler()
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
+        
+        # Initialize publish handler and subscriptions handler
+        self.message_handler.publish_handler = PublishHandler()
+        self.message_handler.subscription_handler = SubscriptionHandler()
+        
+        # Start message handler
+        self.loop.run_until_complete(self.message_handler.start())
 
     def tearDown(self):
         """Clean up after each test"""
@@ -247,6 +254,9 @@ class TestMessageFlowIntegration(unittest.TestCase):
             retain=False
         )
 
+        # Mock the publish handler's packet ID generator
+        self.message_handler.publish_handler._get_next_packet_id = Mock(return_value=1)
+        
         # Execute message flow
         self.loop.run_until_complete(
             self.message_handler._handle_publish(publish_packet)
@@ -255,22 +265,35 @@ class TestMessageFlowIntegration(unittest.TestCase):
         # Verify QoS downgrade for QoS 0 subscriber
         qos0_messages = self.message_handler.get_session_messages(subscriber_qos0_id)
         self.assertEqual(len(qos0_messages), 0)  # QoS 0 has no persistence
+        
+        # Give time for async message processing
+        self.loop.run_until_complete(asyncio.sleep(0.1))
 
         # Verify QoS downgrade for QoS 1 subscriber
         qos1_messages = self.message_handler.get_session_messages(subscriber_qos1_id)
-        self.assertEqual(len(qos1_messages), 1)
+        self.assertEqual(len(qos1_messages), 1, "QoS 1 subscriber should have one pending message")
+        first_qos1_message = list(qos1_messages.values())[0]
         self.assertEqual(
-            list(qos1_messages.values())[0].qos_level,
-            QoSLevel.AT_LEAST_ONCE
+            first_qos1_message.qos_level,
+            QoSLevel.AT_LEAST_ONCE,
+            "QoS 1 message should maintain AT_LEAST_ONCE delivery"
         )
 
         # Verify QoS maintained for QoS 2 subscriber
         qos2_messages = self.message_handler.get_session_messages(subscriber_qos2_id)
-        self.assertEqual(len(qos2_messages), 1)
+        self.assertEqual(len(qos2_messages), 1, "QoS 2 subscriber should have one pending message")
+        first_qos2_message = list(qos2_messages.values())[0]
         self.assertEqual(
-            list(qos2_messages.values())[0].qos_level,
-            QoSLevel.EXACTLY_ONCE
+            first_qos2_message.qos_level,
+            QoSLevel.EXACTLY_ONCE,
+            "QoS 2 message should maintain EXACTLY_ONCE delivery"
         )
+
+        # Verify message content
+        for messages in [qos1_messages, qos2_messages]:
+            msg = list(messages.values())[0]
+            self.assertEqual(msg.topic, test_topic, "Message topic should match")
+            self.assertEqual(msg.payload, b"mixed qos test", "Message payload should match")
 
 if __name__ == '__main__':
     # Create a test suite combining all test cases
