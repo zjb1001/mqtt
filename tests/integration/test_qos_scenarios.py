@@ -136,13 +136,20 @@ class TestQoSScenarios(unittest.TestCase):
             # Process message
             await self.message_handler._handle_publish(publish_packet)
             
+            # Wait briefly for message to be stored
+            await asyncio.sleep(0.1)
+            
+            # Verify message is stored
+            self.assertIn(1, self.session2.pending_messages)
+            qos_msg = self.session2.pending_messages[1]
+            self.assertFalse(qos_msg.ack_received)
+            
             # Wait for retry attempt
             await asyncio.sleep(0.2)
             
             # Verify retry occurred
             qos_msg = self.session2.pending_messages[1]
             self.assertTrue(qos_msg.retry_count > 0)
-            self.assertFalse(qos_msg.ack_received)
             
             # Simulate late PUBACK
             await self.message_handler.handle_message_acknowledgment(
