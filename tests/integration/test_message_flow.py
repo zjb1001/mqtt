@@ -175,6 +175,124 @@ class TestMessageFlow(unittest.TestCase):
         """Test handling of mixed QoS levels between publishers and subscribers"""
         # Setup subscriber with mixed QoS subscriptions
         subscriber_id = "mixed_sub"
+
+    async def test_retained_messages_with_session_persistence(self):
+        """Test retained message interaction with session persistence in real environment"""
+        # Setup publisher and send retained message
+        publisher_id = "retained_pub"
+        await self._setup_session(publisher_id)
+        
+        # Send multiple retained messages on different topics
+        retained_messages = [
+            ("test/retained1", b"retained message 1", QoSLevel.AT_LEAST_ONCE),
+            ("test/retained2", b"retained message 2", QoSLevel.EXACTLY_ONCE)
+        ]
+        
+        for topic, payload, qos in retained_messages:
+            packet = PublishPacket(
+                topic=topic,
+                payload=payload,
+                qos=qos,
+                retain=True,
+                packet_id=self.publish_handler._get_next_packet_id()
+            )
+            await self.message_handler._handle_publish(packet)
+        
+        # Create persistent session with multiple subscriptions
+        subscriber_id = "retained_sub"
+        await self._setup_session(subscriber_id, clean_session=False)
+        
+        # Subscribe to topics in multiple batches
+        await self._subscribe_client(subscriber_id, "test/retained1", QoSLevel.AT_LEAST_ONCE)
+        # Simulate network delay
+        await asyncio.sleep(0.1)
+        await self._subscribe_client(subscriber_id, "test/retained2", QoSLevel.EXACTLY_ONCE)
+        
+        # Verify all retained messages are delivered with correct QoS
+        subscriber_messages = self.message_handler.sessions[subscriber_id].pending_messages
+        self.assertEqual(len(subscriber_messages), 2)
+        
+        # Verify message properties and complete flows
+        for msg_id, msg in subscriber_messages.items():
+            if msg.topic == "test/retained1":
+                # Complete QoS 1 flow
+                await self.message_handler.handle_message_acknowledgment(
+                    subscriber_id, msg_id, "PUBACK"
+                )
+            else:
+                # Complete QoS 2 flow
+                await self.message_handler.handle_message_acknowledgment(
+                    subscriber_id, msg_id, "PUBREC"
+                )
+                await self.message_handler.handle_message_acknowledgment(
+                    subscriber_id, msg_id, "PUBREL"
+                )
+                await self.message_handler.handle_message_acknowledgment(
+                    subscriber_id, msg_id, "PUBCOMP"
+                )
+        
+        # Verify all messages are cleared
+        self.assertEqual(len(self.message_handler.sessions[subscriber_id].pending_messages), 0)
+
+    async def test_high_throughput_message_ordering(self):
+        """Test message ordering under high load with multiple publishers and subscribers"""
+        NUM_MESSAGES = 100
+        NUM_PUBLISHERS = 3
+        NUM_SUBSCRIBERS = 2
+        
+        # Setup subscribers
+        subscriber_ids = [f"order_sub_{i}" for i in range(NUM_SUBSCRIBERS)]
+        for sub_id in subscriber_ids:
+            await self._setup_session(sub_id)
+            await self._subscribe_client(sub_id, "test/order/#", QoSLevel.EXACTLY_ONCE)
+        
+        # Setup publishers
+        publisher_ids = [f"order_pub_{i}" for i in range(NUM_PUBLISHERS)]
+        for pub_id in publisher_ids:
+            await self._setup_session(pub_id)
+        
+        # Send messages from all publishers
+        publish_tasks = []
+        expected_messages = {}
+        
+        for pub_id in publisher_ids:
+            messages = []
+            for i in range(NUM_MESSAGES):
+                topic = f"test/order/{pub_id}"
+                payload = f"{pub_id}_message_{i}".encode()
+                packet = PublishPacket(
+                    topic=topic,
+                    payload=payload,
+                    qos=QoSLevel.EXACTLY_ONCE,
+                    retain=False,
+                    packet_id=self.publish_handler._get_next_packet_id()
+                )
+                messages.append((topic, payload))
+                publish_tasks.append(self.message_handler._handle_publish(packet))
+            expected_messages[pub_id] = messages
+        
+        # Wait for all publishes to complete
+        await asyncio.gather(*publish_tasks)
+        
+        # Verify message ordering for each subscriber
+        for sub_id in subscriber_ids:
+            subscriber_messages = self.message_handler.sessions[sub_id].pending_messages
+            
+            # Group messages by publisher
+            received_messages = {}
+            for msg_id, msg in subscriber_messages.items():
+                pub_id = msg.topic.split('/')[-1]
+                if pub_id not in received_messages:
+                    received_messages[pub_id] = []
+                received_messages[pub_id].append((msg.topic, msg.payload))
+            
+            # Verify order for each publisher
+            for pub_id, messages in expected_messages.items():
+                received = received_messages.get(pub_id, [])
+                self.assertEqual(len(received), len(messages))
+                for i, (exp_topic, exp_payload) in enumerate(messages):
+                    self.assertEqual(received[i][0], exp_topic)
+                    self.assertEqual(received[i][1], exp_payload)
         await self._setup_session(subscriber_id)
         
         # Subscribe to multiple topics with different QoS
@@ -226,12 +344,14 @@ if __name__ == '__main__':
     # Create test suite
     suite = unittest.TestSuite()
     
-    # Create test cases
+    # Add test cases to suite
     test_cases = [
         TestMessageFlow("test_single_publisher_multiple_subscribers"),
         TestMessageFlow("test_multiple_publishers_single_subscriber"),
         TestMessageFlow("test_session_persistence_and_message_delivery"),
-        TestMessageFlow("test_mixed_qos_levels")
+        TestMessageFlow("test_mixed_qos_levels"),
+        TestMessageFlow("test_retained_messages_with_session_persistence"),
+        TestMessageFlow("test_high_throughput_message_ordering")
     ]
     
     # Add test cases to suite
