@@ -63,9 +63,10 @@ class MessageHandler:
         self.retry_interval: float = 5.0
         self.max_retries: int = 3
         
-    async def start(self) -> None:
+    async def start(self) -> asyncio.Task:
         """Start message handling loop"""
-        asyncio.create_task(self._process_message_queue())
+        task = asyncio.create_task(self._process_message_queue())
+        return task
         
     async def _process_message_queue(self) -> None:
         """Main message processing loop"""

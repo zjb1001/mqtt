@@ -19,22 +19,52 @@ from src.subscribe import SubscriptionHandler
 class TestMessageFlowIntegration(unittest.TestCase):
     """Integration test suite for MQTT message flow scenarios"""
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
+        """Set up test environment once for all tests"""
+        cls.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(cls.loop)
+
+    async def asyncSetUp(self):
         """Set up test environment before each test"""
         self.message_handler = MessageHandler()
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
         
-        # Initialize publish handler and subscriptions handler
+        # Initialize handlers
         self.message_handler.publish_handler = PublishHandler()
         self.message_handler.subscription_handler = SubscriptionHandler()
         
         # Start message handler
-        self.loop.run_until_complete(self.message_handler.start())
+        self.message_processing_task = await self.message_handler.start()
+
+    async def asyncTearDown(self):
+        """Clean up after each test"""
+        # Cancel message processing task
+        if hasattr(self, 'message_processing_task'):
+            self.message_processing_task.cancel()
+            try:
+                await self.message_processing_task
+            except asyncio.CancelledError:
+                pass
+            
+        # Clear message queue
+        while not self.message_handler.message_queue.queue.empty():
+            try:
+                self.message_handler.message_queue.queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
+    def setUp(self):
+        self.loop.run_until_complete(self.asyncSetUp())
 
     def tearDown(self):
-        """Clean up after each test"""
-        self.loop.close()
+        self.loop.run_until_complete(self.asyncTearDown())
+
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up after all tests"""
+        pending = asyncio.all_tasks(cls.loop)
+        cls.loop.run_until_complete(asyncio.gather(*pending))
+        cls.loop.close()
 
     def test_single_publisher_multiple_subscribers(self):
         """Test end-to-end message flow with one publisher and multiple subscribers"""
