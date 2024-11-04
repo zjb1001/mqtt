@@ -302,23 +302,26 @@ class TestMessageFlow(unittest.TestCase):
                                    f"Subscriber {sub_id} payload mismatch at index {i}")
 
 if __name__ == '__main__':
-    # Create test suite
-    suite = unittest.TestSuite()
-    
-    # Add test cases to suite
-    test_cases = [
-        TestMessageFlow("test_single_publisher_multiple_subscribers"),
-        TestMessageFlow("test_multiple_publishers_single_subscriber"),
-        TestMessageFlow("test_session_persistence_and_message_delivery"),
-        TestMessageFlow("test_mixed_qos_levels"),
-        TestMessageFlow("test_retained_messages_with_session_persistence"),
-        TestMessageFlow("test_high_throughput_message_ordering")
-    ]
-    
-    # Add test cases to suite
-    for test in test_cases:
-        suite.addTest(test)
-    
-    # Run test suite
-    runner = unittest.TextTestRunner(verbosity=2)
-    runner.run(suite)
+    async def run_async_tests():
+        # Create and run test cases
+        test_cases = [
+            TestMessageFlow("test_single_publisher_multiple_subscribers"),
+            TestMessageFlow("test_multiple_publishers_single_subscriber"),
+            TestMessageFlow("test_session_persistence_and_message_delivery"),
+            TestMessageFlow("test_mixed_qos_levels"),
+            TestMessageFlow("test_retained_messages_with_session_persistence"),
+            TestMessageFlow("test_high_throughput_message_ordering")
+        ]
+        
+        for test in test_cases:
+            # Get the test method
+            test_method = getattr(test, test._testMethodName)
+            
+            # If it's a coroutine, await it
+            if asyncio.iscoroutinefunction(test_method):
+                await test_method()
+            else:
+                test_method()
+
+    # Run the async tests using asyncio
+    asyncio.run(run_async_tests())
