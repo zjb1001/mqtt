@@ -337,7 +337,7 @@ class TestQoSScenarios(unittest.TestCase):
             
         self.loop.run_until_complete(run_test())
 
-def create_test_suite():
+def run_test():
     """Create and return a test suite containing all test cases"""
     suite = unittest.TestSuite()
     
@@ -352,11 +352,20 @@ def create_test_suite():
         'test_mixed_qos_levels'
     ]
     
-    for test_case in test_cases:
-        suite.addTest(TestQoSScenarios(test_case))
+    # for test_case in test_cases:
+    #     suite.addTest(TestQoSScenarios(test_case))
     
-    return suite
+    suite.addTest(TestQoSScenarios("test_qos0_delivery_pattern"))
+    suite.addTest(TestQoSScenarios("test_qos1_acknowledgment_flow"))
+    suite.addTest(TestQoSScenarios("test_qos1_retry_behavior"))
+    suite.addTest(TestQoSScenarios("test_qos2_complete_flow"))
+    suite.addTest(TestQoSScenarios("test_qos2_partial_flow"))
+    suite.addTest(TestQoSScenarios("test_qos2_recovery_procedure"))
+    suite.addTest(TestQoSScenarios("test_mixed_qos_levels"))
+
+    # Run test suite
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(suite)
 
 if __name__ == '__main__':
-    import asynctest
-    asynctest.main()
+    run_test()
