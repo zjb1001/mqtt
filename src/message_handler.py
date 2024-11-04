@@ -105,14 +105,18 @@ class MessageHandler:
                 
             session = self.sessions[client_id]
 
-            # Create QoS tracking message for QoS > 0
-            if effective_qos > QoSLevel.AT_MOST_ONCE:
+            # Handle message based on QoS level
+            if effective_qos == QoSLevel.AT_MOST_ONCE:
+                # QoS 0 - Fire and forget
+                pass
+            else:
+                # QoS 1 and 2 - Create tracking message
                 qos_msg = QoSMessage(
                     message_id=self.publish_handler._get_next_packet_id(),
                     qos_level=effective_qos,
                     timestamp=datetime.now(),
-                    topic=packet.topic,  # Add topic for reference
-                    payload=packet.payload  # Add payload for message content
+                    topic=packet.topic,
+                    payload=packet.payload
                 )
                 
                 # Track message and add to session's pending messages
