@@ -59,10 +59,11 @@ class TestQoSScenarios(unittest.TestCase):
     async def tearDown(self):
         """Clean up after each test asynchronously"""
         # Clean up any pending tasks
-        tasks = asyncio.all_tasks()
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        if tasks:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def test_qos0_delivery_pattern(self):
         """Test QoS 0 message delivery patterns"""
@@ -233,8 +234,6 @@ class TestQoSScenarios(unittest.TestCase):
         
         # Verify message is completed
         self.assertNotIn(1, self.session2.pending_messages)
-            
-        self.loop.run_until_complete(run_test())
 
     async def test_qos2_recovery_procedure(self):
         """Test QoS 2 recovery procedures"""
@@ -275,8 +274,6 @@ class TestQoSScenarios(unittest.TestCase):
         
         # Verify message is completed
         self.assertNotIn(1, self.session2.pending_messages)
-            
-        self.loop.run_until_complete(run_test())
 
     async def test_mixed_qos_levels(self):
         """Test handling of mixed QoS level messages"""
@@ -333,8 +330,6 @@ class TestQoSScenarios(unittest.TestCase):
         
         # Verify all messages are completed
         self.assertEqual(len(self.session2.pending_messages), 0)
-            
-        self.loop.run_until_complete(run_test())
 
 async def run_tests():
     """Run all QoS scenario tests"""
