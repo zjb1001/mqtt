@@ -240,22 +240,26 @@ class TestMessageFlow(unittest.TestCase):
         NUM_PUBLISHERS = 3
         NUM_SUBSCRIBERS = 2
         
-        # Setup subscribers
-        subscriber_ids = [f"order_sub_{i}" for i in range(NUM_SUBSCRIBERS)]
-        for sub_id in subscriber_ids:
-            await self._setup_session(sub_id)
+        # Setup subscribers with sessions
+        subscribers = {}
+        for i in range(NUM_SUBSCRIBERS):
+            sub_id = f"order_sub_{i}"
+            session = await self._setup_session(sub_id)
             await self._subscribe_client(sub_id, "test/order/#", QoSLevel.EXACTLY_ONCE)
+            subscribers[sub_id] = session
         
-        # Setup publishers
-        publisher_ids = [f"order_pub_{i}" for i in range(NUM_PUBLISHERS)]
-        for pub_id in publisher_ids:
-            await self._setup_session(pub_id)
+        # Setup publishers with sessions
+        publishers = {}
+        for i in range(NUM_PUBLISHERS):
+            pub_id = f"order_pub_{i}"
+            session = await self._setup_session(pub_id)
+            publishers[pub_id] = session
         
         # Send messages from all publishers
         publish_tasks = []
         expected_messages = {}
         
-        for pub_id in publisher_ids:
+        for pub_id in publishers.keys():
             messages = []
             for i in range(NUM_MESSAGES):
                 topic = f"test/order/{pub_id}"
@@ -275,8 +279,8 @@ class TestMessageFlow(unittest.TestCase):
         await asyncio.gather(*publish_tasks)
         
         # Verify message ordering for each subscriber
-        for sub_id in subscriber_ids:
-            subscriber_messages = self.message_handler.sessions[sub_id].pending_messages
+        for sub_id, session in subscribers.items():
+            subscriber_messages = session.pending_messages
             
             # Group messages by publisher
             received_messages = {}
@@ -289,10 +293,13 @@ class TestMessageFlow(unittest.TestCase):
             # Verify order for each publisher
             for pub_id, messages in expected_messages.items():
                 received = received_messages.get(pub_id, [])
-                self.assertEqual(len(received), len(messages))
+                self.assertEqual(len(received), len(messages),
+                               f"Subscriber {sub_id} message count mismatch for publisher {pub_id}")
                 for i, (exp_topic, exp_payload) in enumerate(messages):
-                    self.assertEqual(received[i][0], exp_topic)
-                    self.assertEqual(received[i][1], exp_payload)
+                    self.assertEqual(received[i][0], exp_topic,
+                                   f"Subscriber {sub_id} topic mismatch at index {i}")
+                    self.assertEqual(received[i][1], exp_payload,
+                                   f"Subscriber {sub_id} payload mismatch at index {i}")
         await self._setup_session(subscriber_id)
         
         # Subscribe to multiple topics with different QoS
