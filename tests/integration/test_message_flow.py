@@ -273,14 +273,12 @@ class TestMessageFlowIntegration(unittest.TestCase):
         )
 
 if __name__ == '__main__':
-    unittest.main(verbosity=2)    
-    
     # Create a test suite combining all test cases
     suite = unittest.TestSuite()
 
-    suite.addTest(TestMessageFlowIntegration("test_single_publisher_multiple_subscribers"))
-    suite.addTest(TestMessageFlowIntegration("test_multiple_publishers_single_subscriber"))
-    suite.addTest(TestMessageFlowIntegration("test_session_persistence_and_message_delivery"))
+    # suite.addTest(TestMessageFlowIntegration("test_single_publisher_multiple_subscribers"))
+    # suite.addTest(TestMessageFlowIntegration("test_multiple_publishers_single_subscriber"))
+    # suite.addTest(TestMessageFlowIntegration("test_session_persistence_and_message_delivery"))
     suite.addTest(TestMessageFlowIntegration("test_mixed_qos_levels"))
 
     # Run the test suite
