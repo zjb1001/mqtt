@@ -3,6 +3,11 @@ import asyncio
 from unittest.mock import Mock, patch
 from datetime import datetime, timedelta
 
+# Add src into path
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
 from src.publish import PublishPacket, PublishHandler
 from src.message_handler import MessageHandler, MessageQueue
 from src.session import SessionState, QoSMessage
