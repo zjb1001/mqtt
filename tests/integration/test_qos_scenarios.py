@@ -155,184 +155,184 @@ class TestQoSScenarios(unittest.TestCase):
 
     async def test_qos2_complete_flow(self):
         """Test complete QoS 2 message flow"""
-            # Create QoS 2 message
-            publish_packet = PublishPacket(
-                topic="test/topic",
-                payload=b"QoS 2 test message",
-                qos=QoSLevel.EXACTLY_ONCE,
-                retain=False,
-                packet_id=1
-            )
-            
-            # Process initial message
-            await self.message_handler._handle_publish(publish_packet)
-            
-            # Verify message is stored
-            self.assertIn(1, self.session2.pending_messages)
-            qos_msg = self.session2.pending_messages[1]
-            self.assertEqual(qos_msg.state, "PENDING")
-            
-            # Simulate PUBREC
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBREC"
-            )
-            self.assertEqual(qos_msg.state, "PUBREC_RECEIVED")
-            
-            # Simulate PUBREL
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBREL"
-            )
-            self.assertEqual(qos_msg.state, "PUBREL_RECEIVED")
-            
-            # Simulate PUBCOMP
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBCOMP"
-            )
-            
-            # Verify message is completed
-            self.assertNotIn(1, self.session2.pending_messages)
+        # Create QoS 2 message
+        publish_packet = PublishPacket(
+            topic="test/topic",
+            payload=b"QoS 2 test message",
+            qos=QoSLevel.EXACTLY_ONCE,
+            retain=False,
+            packet_id=1
+        )
+        
+        # Process initial message
+        await self.message_handler._handle_publish(publish_packet)
+        
+        # Verify message is stored
+        self.assertIn(1, self.session2.pending_messages)
+        qos_msg = self.session2.pending_messages[1]
+        self.assertEqual(qos_msg.state, "PENDING")
+        
+        # Simulate PUBREC
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBREC"
+        )
+        self.assertEqual(qos_msg.state, "PUBREC_RECEIVED")
+        
+        # Simulate PUBREL
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBREL"
+        )
+        self.assertEqual(qos_msg.state, "PUBREL_RECEIVED")
+        
+        # Simulate PUBCOMP
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBCOMP"
+        )
+        
+        # Verify message is completed
+        self.assertNotIn(1, self.session2.pending_messages)
 
 
     async def test_qos2_partial_flow(self):
         """Test QoS 2 partial completion scenarios"""
-            # Set shorter retry interval
-            self.message_handler.retry_interval = 0.1
-            
-            # Create QoS 2 message
-            publish_packet = PublishPacket(
-                topic="test/topic",
-                payload=b"QoS 2 partial test",
-                qos=QoSLevel.EXACTLY_ONCE,
-                retain=False,
-                packet_id=1
-            )
-            
-            # Process initial message
-            await self.message_handler._handle_publish(publish_packet)
-            
-            # Simulate PUBREC
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBREC"
-            )
-            
-            # Wait for retry attempt
-            await asyncio.sleep(0.2)
-            
-            # Verify message is still in PUBREC state
-            qos_msg = self.session2.pending_messages[1]
-            self.assertEqual(qos_msg.state, "PUBREC_RECEIVED")
-            self.assertTrue(qos_msg.retry_count > 0)
-            
-            # Complete the flow
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBREL"
-            )
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBCOMP"
-            )
-            
-            # Verify message is completed
-            self.assertNotIn(1, self.session2.pending_messages)
+        # Set shorter retry interval
+        self.message_handler.retry_interval = 0.1
+        
+        # Create QoS 2 message
+        publish_packet = PublishPacket(
+            topic="test/topic",
+            payload=b"QoS 2 partial test",
+            qos=QoSLevel.EXACTLY_ONCE,
+            retain=False,
+            packet_id=1
+        )
+        
+        # Process initial message
+        await self.message_handler._handle_publish(publish_packet)
+        
+        # Simulate PUBREC
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBREC"
+        )
+        
+        # Wait for retry attempt
+        await asyncio.sleep(0.2)
+        
+        # Verify message is still in PUBREC state
+        qos_msg = self.session2.pending_messages[1]
+        self.assertEqual(qos_msg.state, "PUBREC_RECEIVED")
+        self.assertTrue(qos_msg.retry_count > 0)
+        
+        # Complete the flow
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBREL"
+        )
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBCOMP"
+        )
+        
+        # Verify message is completed
+        self.assertNotIn(1, self.session2.pending_messages)
             
         self.loop.run_until_complete(run_test())
 
     async def test_qos2_recovery_procedure(self):
         """Test QoS 2 recovery procedures"""
-            # Create QoS 2 message in PUBREC state
-            qos_msg = QoSMessage(
-                message_id=1,
-                qos_level=QoSLevel.EXACTLY_ONCE,
-                timestamp=datetime.now()
-            )
-            qos_msg.state = "PUBREC_RECEIVED"
-            self.session2.pending_messages[1] = qos_msg
-            
-            # Simulate connection loss and recovery
-            publish_packet = PublishPacket(
-                topic="test/topic",
-                payload=b"QoS 2 recovery test",
-                qos=QoSLevel.EXACTLY_ONCE,
-                retain=False,
-                packet_id=1,
-                dup=True
-            )
-            
-            # Process duplicate message
-            await self.message_handler._handle_publish(publish_packet)
-            
-            # Verify message state is preserved
-            self.assertIn(1, self.session2.pending_messages)
-            recovered_msg = self.session2.pending_messages[1]
-            self.assertEqual(recovered_msg.state, "PUBREC_RECEIVED")
-            
-            # Complete the flow
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBREL"
-            )
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBCOMP"
-            )
-            
-            # Verify message is completed
-            self.assertNotIn(1, self.session2.pending_messages)
+        # Create QoS 2 message in PUBREC state
+        qos_msg = QoSMessage(
+            message_id=1,
+            qos_level=QoSLevel.EXACTLY_ONCE,
+            timestamp=datetime.now()
+        )
+        qos_msg.state = "PUBREC_RECEIVED"
+        self.session2.pending_messages[1] = qos_msg
+        
+        # Simulate connection loss and recovery
+        publish_packet = PublishPacket(
+            topic="test/topic",
+            payload=b"QoS 2 recovery test",
+            qos=QoSLevel.EXACTLY_ONCE,
+            retain=False,
+            packet_id=1,
+            dup=True
+        )
+        
+        # Process duplicate message
+        await self.message_handler._handle_publish(publish_packet)
+        
+        # Verify message state is preserved
+        self.assertIn(1, self.session2.pending_messages)
+        recovered_msg = self.session2.pending_messages[1]
+        self.assertEqual(recovered_msg.state, "PUBREC_RECEIVED")
+        
+        # Complete the flow
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBREL"
+        )
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBCOMP"
+        )
+        
+        # Verify message is completed
+        self.assertNotIn(1, self.session2.pending_messages)
             
         self.loop.run_until_complete(run_test())
 
     async def test_mixed_qos_levels(self):
         """Test handling of mixed QoS level messages"""
-            # Create messages with different QoS levels
-            messages = [
-                PublishPacket(
-                    topic="test/topic",
-                    payload=b"QoS 0 message",
-                    qos=QoSLevel.AT_MOST_ONCE,
-                    retain=False
-                ),
-                PublishPacket(
-                    topic="test/topic",
-                    payload=b"QoS 1 message",
-                    qos=QoSLevel.AT_LEAST_ONCE,
-                    retain=False,
-                    packet_id=1
-                ),
-                PublishPacket(
-                    topic="test/topic",
-                    payload=b"QoS 2 message",
-                    qos=QoSLevel.EXACTLY_ONCE,
-                    retain=False,
-                    packet_id=2
-                )
-            ]
-            
-            # Process all messages
-            for packet in messages:
-                await self.message_handler._handle_publish(packet)
-            
-            # Verify QoS 0 message is not stored
-            self.assertNotIn(0, self.session2.pending_messages)
-            
-            # Verify QoS 1 and 2 messages are stored
-            self.assertIn(1, self.session2.pending_messages)
-            self.assertIn(2, self.session2.pending_messages)
-            
-            # Complete QoS 1 flow
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBACK"
+        # Create messages with different QoS levels
+        messages = [
+            PublishPacket(
+                topic="test/topic",
+                payload=b"QoS 0 message",
+                qos=QoSLevel.AT_MOST_ONCE,
+                retain=False
+            ),
+            PublishPacket(
+                topic="test/topic",
+                payload=b"QoS 1 message",
+                qos=QoSLevel.AT_LEAST_ONCE,
+                retain=False,
+                packet_id=1
+            ),
+            PublishPacket(
+                topic="test/topic",
+                payload=b"QoS 2 message",
+                qos=QoSLevel.EXACTLY_ONCE,
+                retain=False,
+                packet_id=2
             )
-            
-            # Complete QoS 2 flow
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 2, "PUBREC"
-            )
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 2, "PUBREL"
-            )
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 2, "PUBCOMP"
-            )
-            
-            # Verify all messages are completed
-            self.assertEqual(len(self.session2.pending_messages), 0)
+        ]
+        
+        # Process all messages
+        for packet in messages:
+            await self.message_handler._handle_publish(packet)
+        
+        # Verify QoS 0 message is not stored
+        self.assertNotIn(0, self.session2.pending_messages)
+        
+        # Verify QoS 1 and 2 messages are stored
+        self.assertIn(1, self.session2.pending_messages)
+        self.assertIn(2, self.session2.pending_messages)
+        
+        # Complete QoS 1 flow
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBACK"
+        )
+        
+        # Complete QoS 2 flow
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 2, "PUBREC"
+        )
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 2, "PUBREL"
+        )
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 2, "PUBCOMP"
+        )
+        
+        # Verify all messages are completed
+        self.assertEqual(len(self.session2.pending_messages), 0)
             
         self.loop.run_until_complete(run_test())
 
