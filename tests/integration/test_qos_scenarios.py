@@ -19,9 +19,13 @@ class TestQoSScenarios(unittest.TestCase):
 
     async def setUp(self):
         """Set up test environment before each test asynchronously"""
-        self.message_handler = MessageHandler()
-        self.publish_handler = PublishHandler()
         self.connection_handler = ConnectionHandler()
+        self.publish_handler = PublishHandler()
+        self.message_handler = MessageHandler()
+        
+        # Link handlers
+        self.message_handler.connection_handler = self.connection_handler
+        self.message_handler.publish_handler = self.publish_handler
         
         # Set up test clients
         self.client1_id = "test_publisher"
@@ -76,7 +80,8 @@ class TestQoSScenarios(unittest.TestCase):
         )
         
         # Process message
-        await self.message_handler._handle_publish(publish_packet)
+        # Publish message from client1
+        await self.message_handler._handle_publish(publish_packet, self.client1_id)
         
         # Verify delivery behavior
         self.client2_writer.write.assert_called_once()
@@ -99,7 +104,7 @@ class TestQoSScenarios(unittest.TestCase):
         )
         
         # Process initial message
-        await self.message_handler._handle_publish(publish_packet)
+        await self.message_handler._handle_publish(publish_packet, self.client1_id)
         
         # Verify message is stored in session
         self.assertIn(1, self.session2.pending_messages)
@@ -129,7 +134,7 @@ class TestQoSScenarios(unittest.TestCase):
         )
         
         # Process message
-        await self.message_handler._handle_publish(publish_packet)
+        await self.message_handler._handle_publish(publish_packet, self.client1_id)
         
         # Wait briefly for message to be stored
         await asyncio.sleep(0.1)
@@ -166,7 +171,7 @@ class TestQoSScenarios(unittest.TestCase):
         )
         
         # Process initial message
-        await self.message_handler._handle_publish(publish_packet)
+        await self.message_handler._handle_publish(publish_packet, self.client1_id)
         
         # Verify message is stored
         self.assertIn(1, self.session2.pending_messages)
@@ -209,7 +214,7 @@ class TestQoSScenarios(unittest.TestCase):
         )
         
         # Process initial message
-        await self.message_handler._handle_publish(publish_packet)
+        await self.message_handler._handle_publish(publish_packet, self.client1_id)
         
         # Simulate PUBREC
         await self.message_handler.handle_message_acknowledgment(
