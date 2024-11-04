@@ -17,8 +17,8 @@ from src.connection import ConnectionHandler
 class TestQoSScenarios(unittest.TestCase):
     """Integration test suite for MQTT QoS scenarios"""
 
-    def setUp(self):
-        """Set up test environment before each test"""
+    async def setUp(self):
+        """Set up test environment before each test asynchronously"""
         self.message_handler = MessageHandler()
         self.publish_handler = PublishHandler()
         self.connection_handler = ConnectionHandler()
@@ -56,9 +56,13 @@ class TestQoSScenarios(unittest.TestCase):
             self.client2_id: self.session2
         }
 
-    def tearDown(self):
-        """Clean up after each test"""
-        pass
+    async def tearDown(self):
+        """Clean up after each test asynchronously"""
+        # Clean up any pending tasks
+        tasks = asyncio.all_tasks()
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def test_qos0_delivery_pattern(self):
         """Test QoS 0 message delivery patterns"""
@@ -149,9 +153,8 @@ class TestQoSScenarios(unittest.TestCase):
         # Verify message is acknowledged
         self.assertNotIn(1, self.session2.pending_messages)
 
-    def test_qos2_complete_flow(self):
+    async def test_qos2_complete_flow(self):
         """Test complete QoS 2 message flow"""
-        async def run_test():
             # Create QoS 2 message
             publish_packet = PublishPacket(
                 topic="test/topic",
@@ -188,12 +191,10 @@ class TestQoSScenarios(unittest.TestCase):
             
             # Verify message is completed
             self.assertNotIn(1, self.session2.pending_messages)
-            
-        self.loop.run_until_complete(run_test())
 
-    def test_qos2_partial_flow(self):
+
+    async def test_qos2_partial_flow(self):
         """Test QoS 2 partial completion scenarios"""
-        async def run_test():
             # Set shorter retry interval
             self.message_handler.retry_interval = 0.1
             
@@ -235,9 +236,8 @@ class TestQoSScenarios(unittest.TestCase):
             
         self.loop.run_until_complete(run_test())
 
-    def test_qos2_recovery_procedure(self):
+    async def test_qos2_recovery_procedure(self):
         """Test QoS 2 recovery procedures"""
-        async def run_test():
             # Create QoS 2 message in PUBREC state
             qos_msg = QoSMessage(
                 message_id=1,
@@ -278,9 +278,8 @@ class TestQoSScenarios(unittest.TestCase):
             
         self.loop.run_until_complete(run_test())
 
-    def test_mixed_qos_levels(self):
+    async def test_mixed_qos_levels(self):
         """Test handling of mixed QoS level messages"""
-        async def run_test():
             # Create messages with different QoS levels
             messages = [
                 PublishPacket(
@@ -337,35 +336,29 @@ class TestQoSScenarios(unittest.TestCase):
             
         self.loop.run_until_complete(run_test())
 
-def run_test():
-    """Create and return a test suite containing all test cases"""
-    suite = unittest.TestSuite()
-    
-    # Add all test methods from TestQoSScenarios
+async def run_tests():
+    """Run all QoS scenario tests"""
     test_cases = [
-        'test_qos0_delivery_pattern',
-        'test_qos1_acknowledgment_flow',
-        'test_qos1_retry_behavior',
-        'test_qos2_complete_flow',
-        'test_qos2_partial_flow',
-        'test_qos2_recovery_procedure',
-        'test_mixed_qos_levels'
+        TestQoSScenarios("test_qos0_delivery_pattern"),
+        TestQoSScenarios("test_qos1_acknowledgment_flow"),
+        TestQoSScenarios("test_qos1_retry_behavior"),
+        TestQoSScenarios("test_qos2_complete_flow"),
+        TestQoSScenarios("test_qos2_partial_flow"),
+        TestQoSScenarios("test_qos2_recovery_procedure"),
+        TestQoSScenarios("test_mixed_qos_levels")
     ]
     
-    # for test_case in test_cases:
-    #     suite.addTest(TestQoSScenarios(test_case))
-    
-    suite.addTest(TestQoSScenarios("test_qos0_delivery_pattern"))
-    suite.addTest(TestQoSScenarios("test_qos1_acknowledgment_flow"))
-    suite.addTest(TestQoSScenarios("test_qos1_retry_behavior"))
-    suite.addTest(TestQoSScenarios("test_qos2_complete_flow"))
-    suite.addTest(TestQoSScenarios("test_qos2_partial_flow"))
-    suite.addTest(TestQoSScenarios("test_qos2_recovery_procedure"))
-    suite.addTest(TestQoSScenarios("test_mixed_qos_levels"))
+    for test_case in test_cases:
+        await test_case.setUp()
+        try:
+            test_method = getattr(test_case, test_case._testMethodName)
+            await test_method()
+        finally:
+            await test_case.tearDown()
 
-    # Run test suite
-    runner = unittest.TextTestRunner(verbosity=2)
-    runner.run(suite)
+def run_test():
+    """Create and run the test suite"""
+    asyncio.run(run_tests())
 
 if __name__ == '__main__':
     run_test()
