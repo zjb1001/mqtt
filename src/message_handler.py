@@ -114,9 +114,7 @@ class MessageHandler:
                 qos_msg = QoSMessage(
                     message_id=self.publish_handler._get_next_packet_id(),
                     qos_level=effective_qos,
-                    timestamp=datetime.now(),
-                    topic=packet.topic,
-                    payload=packet.payload
+                    timestamp=datetime.now()
                 )
                 
                 # Track message and add to session's pending messages
