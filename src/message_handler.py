@@ -104,25 +104,24 @@ class MessageHandler:
                 
             session = self.sessions[client_id]
 
+            # Create QoS tracking message for QoS > 0
             if effective_qos > QoSLevel.AT_MOST_ONCE:
-                # Create QoS tracking message
                 qos_msg = QoSMessage(
                     message_id=self.publish_handler._get_next_packet_id(),
                     qos_level=effective_qos,
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(),
+                    topic=packet.topic,  # Add topic for reference
+                    payload=packet.payload  # Add payload for message content
                 )
+                
+                # Track message and add to session's pending messages
                 self.message_queue.track_inflight_message(client_id, qos_msg)
+                session.pending_messages[qos_msg.message_id] = qos_msg
                 
                 # Start QoS retry handler
                 asyncio.create_task(
                     self._handle_qos_retry(client_id, qos_msg, packet)
                 )
-                
-            # Add to client's session for delivery
-            if client_id in self.sessions:
-                session = self.sessions[client_id]
-                if effective_qos > QoSLevel.AT_MOST_ONCE:
-                    session.pending_messages[qos_msg.message_id] = qos_msg
                 
     async def _handle_qos_retry(self, client_id: str, qos_msg: QoSMessage, packet: PublishPacket) -> None:
         """Handle QoS message retry logic"""
