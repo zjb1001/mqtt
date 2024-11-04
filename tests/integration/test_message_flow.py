@@ -12,8 +12,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from src.message_handler import MessageHandler, RetainedMessage
 from src.session import SessionState, QoSMessage
 from src.will_message import QoSLevel
-from src.publish import PublishPacket
+from src.publish import PublishPacket, PublishHandler
 from src.connection import ConnectPacket
+from src.subscribe import SubscriptionHandler
 
 class TestMessageFlowIntegration(unittest.TestCase):
     """Integration test suite for MQTT message flow scenarios"""
