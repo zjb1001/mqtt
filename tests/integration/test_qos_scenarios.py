@@ -19,9 +19,6 @@ class TestQoSScenarios(unittest.TestCase):
 
     def setUp(self):
         """Set up test environment before each test"""
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        
         self.message_handler = MessageHandler()
         self.publish_handler = PublishHandler()
         self.connection_handler = ConnectionHandler()
@@ -61,105 +58,96 @@ class TestQoSScenarios(unittest.TestCase):
 
     def tearDown(self):
         """Clean up after each test"""
-        self.loop.close()
+        pass
 
-    def test_qos0_delivery_pattern(self):
+    async def test_qos0_delivery_pattern(self):
         """Test QoS 0 message delivery patterns"""
-        async def run_test():
-            # Create QoS 0 message
-            publish_packet = PublishPacket(
-                topic="test/topic",
-                payload=b"QoS 0 test message",
-                qos=QoSLevel.AT_MOST_ONCE,
-                retain=False
-            )
-            
-            # Process message
-            await self.message_handler._handle_publish(publish_packet)
-            
-            # Verify delivery behavior
-            self.client2_writer.write.assert_called_once()
-            self.assertEqual(len(self.session2.pending_messages), 0)
-            
-            # Verify no retransmission attempts
-            self.client2_writer.write.reset_mock()
-            await asyncio.sleep(0.1)
-            self.client2_writer.write.assert_not_called()
+        # Create QoS 0 message
+        publish_packet = PublishPacket(
+            topic="test/topic",
+            payload=b"QoS 0 test message",
+            qos=QoSLevel.AT_MOST_ONCE,
+            retain=False
+        )
         
-        self.loop.run_until_complete(run_test())
+        # Process message
+        await self.message_handler._handle_publish(publish_packet)
+        
+        # Verify delivery behavior
+        self.client2_writer.write.assert_called_once()
+        self.assertEqual(len(self.session2.pending_messages), 0)
+        
+        # Verify no retransmission attempts
+        self.client2_writer.write.reset_mock()
+        await asyncio.sleep(0.1)
+        self.client2_writer.write.assert_not_called()
 
-    def test_qos1_acknowledgment_flow(self):
+    async def test_qos1_acknowledgment_flow(self):
         """Test QoS 1 message delivery and acknowledgment flow"""
-        async def run_test():
-            # Create QoS 1 message
-            publish_packet = PublishPacket(
-                topic="test/topic",
-                payload=b"QoS 1 test message",
-                qos=QoSLevel.AT_LEAST_ONCE,
-                retain=False,
-                packet_id=1
-            )
-            
-            # Process initial message
-            await self.message_handler._handle_publish(publish_packet)
-            
-            # Verify message is stored in session
-            self.assertIn(1, self.session2.pending_messages)
-            qos_msg = self.session2.pending_messages[1]
-            self.assertEqual(qos_msg.qos_level, QoSLevel.AT_LEAST_ONCE)
-            
-            # Simulate PUBACK receipt
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBACK"
-            )
-            
-            # Verify message is removed after acknowledgment
-            self.assertNotIn(1, self.session2.pending_messages)
-            
-        self.loop.run_until_complete(run_test())
+        # Create QoS 1 message
+        publish_packet = PublishPacket(
+            topic="test/topic",
+            payload=b"QoS 1 test message",
+            qos=QoSLevel.AT_LEAST_ONCE,
+            retain=False,
+            packet_id=1
+        )
+        
+        # Process initial message
+        await self.message_handler._handle_publish(publish_packet)
+        
+        # Verify message is stored in session
+        self.assertIn(1, self.session2.pending_messages)
+        qos_msg = self.session2.pending_messages[1]
+        self.assertEqual(qos_msg.qos_level, QoSLevel.AT_LEAST_ONCE)
+        
+        # Simulate PUBACK receipt
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBACK"
+        )
+        
+        # Verify message is removed after acknowledgment
+        self.assertNotIn(1, self.session2.pending_messages)
 
-    def test_qos1_retry_behavior(self):
+    async def test_qos1_retry_behavior(self):
         """Test QoS 1 message retry behavior"""
-        async def run_test():
-            # Configure shorter retry interval for testing
-            self.message_handler.retry_interval = 0.1
-            
-            # Create QoS 1 message
-            publish_packet = PublishPacket(
-                topic="test/topic",
-                payload=b"QoS 1 retry test",
-                qos=QoSLevel.AT_LEAST_ONCE,
-                retain=False,
-                packet_id=1
-            )
-            
-            # Process message
-            await self.message_handler._handle_publish(publish_packet)
-            
-            # Wait briefly for message to be stored
-            await asyncio.sleep(0.1)
-            
-            # Verify message is stored
-            self.assertIn(1, self.session2.pending_messages)
-            qos_msg = self.session2.pending_messages[1]
-            self.assertFalse(qos_msg.ack_received)
-            
-            # Wait for retry attempt
-            await asyncio.sleep(0.2)
-            
-            # Verify retry occurred
-            qos_msg = self.session2.pending_messages[1]
-            self.assertTrue(qos_msg.retry_count > 0)
-            
-            # Simulate late PUBACK
-            await self.message_handler.handle_message_acknowledgment(
-                self.client2_id, 1, "PUBACK"
-            )
-            
-            # Verify message is acknowledged
-            self.assertNotIn(1, self.session2.pending_messages)
-            
-        self.loop.run_until_complete(run_test())
+        # Configure shorter retry interval for testing
+        self.message_handler.retry_interval = 0.1
+        
+        # Create QoS 1 message
+        publish_packet = PublishPacket(
+            topic="test/topic",
+            payload=b"QoS 1 retry test",
+            qos=QoSLevel.AT_LEAST_ONCE,
+            retain=False,
+            packet_id=1
+        )
+        
+        # Process message
+        await self.message_handler._handle_publish(publish_packet)
+        
+        # Wait briefly for message to be stored
+        await asyncio.sleep(0.1)
+        
+        # Verify message is stored
+        self.assertIn(1, self.session2.pending_messages)
+        qos_msg = self.session2.pending_messages[1]
+        self.assertFalse(qos_msg.ack_received)
+        
+        # Wait for retry attempt
+        await asyncio.sleep(0.2)
+        
+        # Verify retry occurred
+        qos_msg = self.session2.pending_messages[1]
+        self.assertTrue(qos_msg.retry_count > 0)
+        
+        # Simulate late PUBACK
+        await self.message_handler.handle_message_acknowledgment(
+            self.client2_id, 1, "PUBACK"
+        )
+        
+        # Verify message is acknowledged
+        self.assertNotIn(1, self.session2.pending_messages)
 
     def test_qos2_complete_flow(self):
         """Test complete QoS 2 message flow"""
@@ -370,11 +358,5 @@ def create_test_suite():
     return suite
 
 if __name__ == '__main__':
-    # Create test suite
-    test_suite = create_test_suite()
-    
-    # Create test runner
-    runner = unittest.TextTestRunner(verbosity=2)
-    
-    # Run the test suite
-    runner.run(test_suite)
+    import asynctest
+    asynctest.main()
